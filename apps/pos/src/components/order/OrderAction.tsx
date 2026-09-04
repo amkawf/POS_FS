@@ -8,8 +8,11 @@ import { Button } from "@mantine/core"
 
 type OrderActionsProps = {
   total: number
+  disabled?: boolean
+  isSaving?: boolean
   onSaveOrder: () => void
   onClearOrder: () => void
+  onPayOrder?: () => void
 }
 
 function formatPrice(value: number) {
@@ -18,9 +21,13 @@ function formatPrice(value: number) {
 
 export function OrderActions({
   total,
+  disabled = false,
+  isSaving = false,
   onSaveOrder,
   onClearOrder,
+  onPayOrder,
 }: OrderActionsProps) {
+
   return (
     <div className="border-t border-slate-200 bg-white p-3">
       <div className="grid grid-cols-3 gap-2">
@@ -29,6 +36,7 @@ export function OrderActions({
           size="sm"
           leftSection={<Save size={14} />}
           onClick={onSaveOrder}
+          disabled={disabled}
           styles={{
             root: {
               borderColor: "#e2e8f0",
@@ -37,7 +45,7 @@ export function OrderActions({
             },
           }}
         >
-          Save
+          {isSaving ? "Saving..." : "Save"}
         </Button>
 
         <Button
@@ -78,6 +86,8 @@ export function OrderActions({
         color="blue"
         leftSection={<CreditCard size={19} />}
         className="mt-2"
+        disabled={disabled}
+        onClick={onPayOrder}
         styles={{
           root: {
             height: 52,

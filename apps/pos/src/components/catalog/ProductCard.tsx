@@ -11,8 +11,6 @@ function formatPrice(value: number) {
 }
 
 export function ProductCard({ product, onAddProduct }: ProductCardProps) {
-  const isLowStock = product.stock <= 5
-
   return (
     <button
       type="button"
@@ -21,17 +19,7 @@ export function ProductCard({ product, onAddProduct }: ProductCardProps) {
     >
       <div className="flex items-start justify-between">
         <span className="text-[10px] font-bold text-slate-400">
-          {product.code}
-        </span>
-
-        <span
-          className={
-            isLowStock
-              ? "border border-red-200 bg-red-50 px-1.5 py-0.5 text-[9px] font-bold text-red-600"
-              : "border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold text-emerald-600"
-          }
-        >
-          {isLowStock ? "LOW STOCK" : `STOCK ${product.stock}`}
+          {product.sku}
         </span>
       </div>
 

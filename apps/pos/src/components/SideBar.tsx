@@ -43,7 +43,11 @@ const menuItems = [
   },
 ]
 
-export function Sidebar() {
+type SidebarProps = {
+  onOpenOrders?: () => void
+}
+
+export function Sidebar({ onOpenOrders }: SidebarProps) {
   return (
     <aside className="flex w-56 flex-col border-r border-slate-200 bg-white">
       <div className="flex h-12 items-center border-b border-slate-200 px-3">
@@ -65,10 +69,15 @@ export function Sidebar() {
               <button
                 key={item.label}
                 type="button"
+                onClick={() => {
+                  if (item.label === "Orders") {
+                    onOpenOrders?.()
+                  }
+                }}
                 className={
                   item.active
-                    ? "flex h-10 w-full items-center gap-3 rounded-md bg-blue-600 px-3 text-left text-xs font-bold text-white"
-                    : "flex h-10 w-full items-center gap-3 rounded-md px-3 text-left text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-950"
+                    ? "flex h-10 w-full items-center gap-3 rounded-md bg-blue-600 px-3 text-left text-xs font-bold text-white cursor-pointer"
+                    : "flex h-10 w-full items-center gap-3 rounded-md px-3 text-left text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-950 cursor-pointer"
                 }
               >
                 <Icon size={17} />

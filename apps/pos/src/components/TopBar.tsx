@@ -1,13 +1,26 @@
 import {
-  Bell,
-  ChevronDown,
-  Monitor,
-  Search,
-  Store,
+	Bell,
+	ChevronDown,
+	Monitor,
+	Search,
+	ShoppingBag,
+	Store,
 } from "lucide-react"
-import { Badge, TextInput } from "@mantine/core"
+import { Badge, Button, TextInput } from "@mantine/core"
 
-export function TopBar() {
+type TopBarProps = {
+  searchQuery?: string
+  onSearchChange?: (value: string) => void
+  onOpenSavedOrders?: () => void
+  openOrdersCount?: number
+}
+
+export function TopBar({
+  searchQuery = "",
+  onSearchChange,
+  onOpenSavedOrders,
+  openOrdersCount,
+}: TopBarProps) {
   return (
     <header className="flex h-16 items-center border-b border-slate-200 bg-white px-4">
       {/* BRAND */}
@@ -33,6 +46,8 @@ export function TopBar() {
         <TextInput
           className="w-full max-w-xl"
           placeholder="Search product or SKU..."
+          value={searchQuery}
+          onChange={(e) => onSearchChange?.(e.currentTarget.value)}
           leftSection={<Search size={17} />}
           rightSection={
             <span className="border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
@@ -50,6 +65,26 @@ export function TopBar() {
             },
           }}
         />
+      </div>
+
+      {/* SAVED ORDERS BUTTON */}
+      <div className="mr-3">
+        <Button
+          variant="light"
+          color="blue"
+          size="xs"
+          leftSection={<ShoppingBag size={15} />}
+          onClick={onOpenSavedOrders}
+          styles={{
+            root: {
+              fontWeight: 700,
+              fontSize: 12,
+              height: 38,
+            },
+          }}
+        >
+          Saved Orders{openOrdersCount !== undefined && openOrdersCount > 0 ? ` (${openOrdersCount})` : ""}
+        </Button>
       </div>
 
       {/* STATUS */}
