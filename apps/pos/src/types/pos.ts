@@ -1,11 +1,13 @@
 export type Product = {
-  code: string
+  id: string
+  sku: string
   name: string
   price: number
-  stock: number
 }
 
 export type OrderItem = {
+  menuItemId: string
+  sku: string
   name: string
   price: number
   qty: number
