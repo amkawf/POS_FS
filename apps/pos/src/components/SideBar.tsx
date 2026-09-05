@@ -45,9 +45,10 @@ const menuItems = [
 
 type SidebarProps = {
   onOpenOrders?: () => void
+  onOpenTables?: () => void
 }
 
-export function Sidebar({ onOpenOrders }: SidebarProps) {
+export function Sidebar({ onOpenOrders, onOpenTables }: SidebarProps) {
   return (
     <aside className="flex w-56 flex-col border-r border-slate-200 bg-white">
       <div className="flex h-12 items-center border-b border-slate-200 px-3">
@@ -72,6 +73,8 @@ export function Sidebar({ onOpenOrders }: SidebarProps) {
                 onClick={() => {
                   if (item.label === "Orders") {
                     onOpenOrders?.()
+                  } else if (item.label === "Tables") {
+                    onOpenTables?.()
                   }
                 }}
                 className={

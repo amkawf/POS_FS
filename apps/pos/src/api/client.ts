@@ -1,5 +1,5 @@
 import { API_BASE_URL } from "../config"
-import type { Category, Product } from "../types/pos"
+import type { Category, Product, Table } from "../types/pos"
 
 export class ApiError extends Error {
   code: string
@@ -61,6 +61,23 @@ export async function fetchMenuCategories(companyId: string): Promise<Category[]
   return data.categories
 }
 
+export async function fetchTables(
+  companyId: string,
+  storeId: string,
+): Promise<Table[]> {
+  const url = new URL(`${API_BASE_URL}/tables`)
+  url.searchParams.set("company_id", companyId)
+  url.searchParams.set("store_id", storeId)
+
+  const response = await fetch(url)
+  if (!response.ok) {
+    await parseErrorResponse(response)
+  }
+
+  const data: { tables: Table[] } = await response.json()
+  return data.tables
+}
+
 export type CreateOrderItemPayload = {
   menu_item_id: string
   item_name: string
@@ -72,6 +89,7 @@ export type CreateOrderItemPayload = {
 export type CreateOrderPayload = {
   company_id: string
   store_id: string
+  table_id?: string
   order_type: string
   order_source: string
   items: CreateOrderItemPayload[]
@@ -79,6 +97,9 @@ export type CreateOrderPayload = {
 
 export type CreateOrderResult = {
   id: string
+  company_id: string
+  store_id: string
+  table_id?: string
   order_number: string
   status: string
   subtotal: number
@@ -121,6 +142,7 @@ export type OrderResponse = {
   id: string
   company_id: string
   store_id: string
+  table_id?: string
   order_number: string
   order_type: string
   order_source: string

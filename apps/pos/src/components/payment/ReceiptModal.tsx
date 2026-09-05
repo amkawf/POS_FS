@@ -7,6 +7,7 @@ type ReceiptModalProps = {
   onClose: () => void
   orderNumber: string
   orderType: string
+  tableNumber?: string
   items: OrderItem[]
   subtotal: number
   totalAmount: number
@@ -25,6 +26,7 @@ export function ReceiptModal({
   onClose,
   orderNumber,
   orderType,
+  tableNumber,
   items,
   subtotal,
   totalAmount,
@@ -79,6 +81,12 @@ export function ReceiptModal({
             <span className="text-slate-500">Type:</span>
             <span className="font-bold">{orderType}</span>
           </div>
+          {tableNumber && (
+            <div className="flex justify-between">
+              <span className="text-slate-500">Table:</span>
+              <span className="font-bold text-blue-600">{tableNumber}</span>
+            </div>
+          )}
           <div className="flex justify-between">
             <span className="text-slate-500">Cashier:</span>
             <span>POS Terminal 01</span>

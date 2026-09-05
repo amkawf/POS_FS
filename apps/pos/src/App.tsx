@@ -6,6 +6,7 @@ import { OrderActions } from "./components/order/OrderAction"
 import { OrderPanel } from "./components/order/OrderPanel"
 import { OrderSummary } from "./components/order/OrderSummary"
 import { SavedOrdersModal } from "./components/order/SavedOrdersModal"
+import { TableSelectModal } from "./components/table/TableSelectModal"
 import { PaymentModal } from "./components/payment/PaymentModal"
 import { ReceiptModal } from "./components/payment/ReceiptModal"
 import { useState } from "react"
@@ -15,18 +16,22 @@ import {
   fetchMenuCategories,
   fetchMenuItems,
   fetchOrders,
+  fetchTables,
   payOrder,
   type OrderResponse,
 } from "./api/client"
 import { DEV_COMPANY_ID, DEV_STORE_ID } from "./config"
-import type { OrderItem, Product } from "./types/pos"
-
+import type { OrderItem, Product, Table } from "./types/pos"
+import { Button } from "@mantine/core"
+import { Table2 } from "lucide-react"
 
 function App() {
   const [orderItems, setOrderItems] = useState<OrderItem[]>([])
   const [lastOrderNumber, setLastOrderNumber] = useState<string | null>(null)
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null)
   const [savedOrdersModalOpen, setSavedOrdersModalOpen] = useState(false)
+  const [tableModalOpen, setTableModalOpen] = useState(false)
+  const [selectedTable, setSelectedTable] = useState<Table | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [activeCategory, setActiveCategory] = useState("ALL")
   const [orderType, setOrderType] = useState<"DINE_IN" | "TAKEAWAY">("DINE_IN")
@@ -37,6 +42,7 @@ function App() {
   const [receiptData, setReceiptData] = useState<{
     orderNumber: string
     orderType: string
+    tableNumber?: string
     items: OrderItem[]
     subtotal: number
     totalAmount: number
@@ -57,6 +63,13 @@ function App() {
     queryFn: () => fetchMenuCategories(DEV_COMPANY_ID),
   })
 
+  const tablesQuery = useQuery({
+    queryKey: ["tables", DEV_COMPANY_ID, DEV_STORE_ID],
+    queryFn: () => fetchTables(DEV_COMPANY_ID, DEV_STORE_ID),
+  })
+
+  const tables = tablesQuery.data ?? []
+
   const openOrdersQuery = useQuery({
     queryKey: ["orders", DEV_COMPANY_ID, DEV_STORE_ID, "OPEN"],
     queryFn: () => fetchOrders(DEV_COMPANY_ID, DEV_STORE_ID, "OPEN"),
@@ -70,6 +83,7 @@ function App() {
     onSuccess: (result) => {
       setOrderItems([])
       setActiveOrderId(null)
+      setSelectedTable(null)
       setLastOrderNumber(result.order_number)
       setSuccessMessage(`Order #${result.order_number} saved successfully!`)
       queryClient.invalidateQueries({ queryKey: ["menu-items"] })
@@ -81,6 +95,12 @@ function App() {
     setActiveOrderId(order.id)
     setLastOrderNumber(order.order_number)
     setOrderType(order.order_type as "DINE_IN" | "TAKEAWAY")
+    if (order.table_id) {
+      const foundTable = tables.find((t) => t.id === order.table_id) ?? null
+      setSelectedTable(foundTable)
+    } else {
+      setSelectedTable(null)
+    }
     setOrderItems(items)
     setSuccessMessage(`Order #${order.order_number} loaded into checkout. Ready to PAY!`)
   }
@@ -147,6 +167,7 @@ function App() {
     createOrderMutation.mutate({
       company_id: DEV_COMPANY_ID,
       store_id: DEV_STORE_ID,
+      table_id: orderType === "DINE_IN" ? selectedTable?.id : undefined,
       order_type: orderType,
       order_source: "POS",
       items: orderItems.map((item) => ({
@@ -178,6 +199,7 @@ function App() {
         const created = await createOrder({
           company_id: DEV_COMPANY_ID,
           store_id: DEV_STORE_ID,
+          table_id: orderType === "DINE_IN" ? selectedTable?.id : undefined,
           order_type: orderType,
           order_source: "POS",
           items: orderItems.map((item) => ({
@@ -201,10 +223,15 @@ function App() {
       })
 
       // 3. Setup receipt data
+      const targetTableNumber =
+        selectedTable?.table_number ||
+        (paidOrder.table_id ? tables.find((t) => t.id === paidOrder.table_id)?.table_number : undefined)
+
       const changeAmount = amountPaid - paidOrder.total_amount
       setReceiptData({
         orderNumber: paidOrder.order_number || targetOrderNumber || "ORD-DONE",
         orderType: paidOrder.order_type || targetOrderType,
+        tableNumber: targetTableNumber,
         items: [...orderItems],
         subtotal: paidOrder.subtotal || finalSubtotal,
         totalAmount: paidOrder.total_amount || finalTotal,
@@ -215,10 +242,12 @@ function App() {
 
       // 4. Invalidate queries & reset cart
       queryClient.invalidateQueries({ queryKey: ["orders"] })
+      queryClient.invalidateQueries({ queryKey: ["tables"] })
       setPaymentModalOpen(false)
       setReceiptModalOpen(true)
       setOrderItems([])
       setActiveOrderId(null)
+      setSelectedTable(null)
       setLastOrderNumber(null)
       setSuccessMessage(null)
     } catch (err) {
@@ -268,7 +297,10 @@ function App() {
       />
 
       <div className="flex min-h-[calc(100vh-4rem)]">
-        <Sidebar onOpenOrders={() => setSavedOrdersModalOpen(true)} />
+        <Sidebar
+          onOpenOrders={() => setSavedOrdersModalOpen(true)}
+          onOpenTables={() => setTableModalOpen(true)}
+        />
 
         <main className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_380px]">
           <section className="min-w-0 border-r border-slate-200">
@@ -380,7 +412,10 @@ function App() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setOrderType("TAKEAWAY")}
+                  onClick={() => {
+                    setOrderType("TAKEAWAY")
+                    setSelectedTable(null)
+                  }}
                   className={`rounded px-2.5 py-1 text-[10px] font-bold transition-all ${
                     orderType === "TAKEAWAY"
                       ? "bg-blue-600 text-white shadow-sm"
@@ -391,6 +426,38 @@ function App() {
                 </button>
               </div>
             </div>
+
+            {orderType === "DINE_IN" && (
+              <div className="flex items-center justify-between border-b border-slate-200 bg-blue-50/50 px-4 py-2">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+                  <Table2 size={15} className="text-blue-600" />
+                  <span>Meja:</span>
+                  <span
+                    className={
+                      selectedTable
+                        ? "text-blue-700 font-extrabold"
+                        : "text-slate-400 font-normal italic"
+                    }
+                  >
+                    {selectedTable ? selectedTable.table_number : "Belum dipilih"}
+                  </span>
+                  {selectedTable && (
+                    <span className="text-[10px] text-slate-500 font-medium">
+                      ({selectedTable.capacity} Kursi)
+                    </span>
+                  )}
+                </div>
+                <Button
+                  size="compact-xs"
+                  variant="light"
+                  color="blue"
+                  onClick={() => setTableModalOpen(true)}
+                  styles={{ root: { fontSize: 11 } }}
+                >
+                  {selectedTable ? "Ganti" : "Pilih Meja"}
+                </Button>
+              </div>
+            )}
 
             <OrderPanel
               items={orderItems}
@@ -421,6 +488,7 @@ function App() {
               onClearOrder={() => {
                 setOrderItems([])
                 setActiveOrderId(null)
+                setSelectedTable(null)
                 setLastOrderNumber(null)
                 setSuccessMessage(null)
               }}
@@ -433,6 +501,18 @@ function App() {
         opened={savedOrdersModalOpen}
         onClose={() => setSavedOrdersModalOpen(false)}
         onSelectOrder={handleSelectSavedOrder}
+      />
+
+      <TableSelectModal
+        opened={tableModalOpen}
+        onClose={() => setTableModalOpen(false)}
+        tables={tables}
+        selectedTableId={selectedTable?.id ?? null}
+        onSelectTable={(tbl) => {
+          setSelectedTable(tbl)
+          setOrderType("DINE_IN")
+        }}
+        onClearTable={() => setSelectedTable(null)}
       />
 
       <PaymentModal
@@ -454,6 +534,7 @@ function App() {
           }}
           orderNumber={receiptData.orderNumber}
           orderType={receiptData.orderType}
+          tableNumber={receiptData.tableNumber}
           items={receiptData.items}
           subtotal={receiptData.subtotal}
           totalAmount={receiptData.totalAmount}
