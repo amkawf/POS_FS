@@ -1,5 +1,5 @@
 import { API_BASE_URL } from "../config"
-import type { Product } from "../types/pos"
+import type { Category, Product } from "../types/pos"
 
 export class ApiError extends Error {
   code: string
@@ -23,6 +23,7 @@ type MenuItemResponse = {
   name: string
   description?: string
   base_price: number
+  category_ids?: string[]
 }
 
 export async function fetchMenuItems(companyId: string): Promise<Product[]> {
@@ -42,7 +43,22 @@ export async function fetchMenuItems(companyId: string): Promise<Product[]> {
     sku: item.sku,
     name: item.name,
     price: item.base_price,
+    categoryIds: item.category_ids ?? [],
   }))
+}
+
+export async function fetchMenuCategories(companyId: string): Promise<Category[]> {
+  const url = new URL(`${API_BASE_URL}/menu-categories`)
+  url.searchParams.set("company_id", companyId)
+
+  const response = await fetch(url)
+
+  if (!response.ok) {
+    await parseErrorResponse(response)
+  }
+
+  const data: { categories: Category[] } = await response.json()
+  return data.categories
 }
 
 export type CreateOrderItemPayload = {

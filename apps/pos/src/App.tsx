@@ -8,11 +8,11 @@ import { OrderSummary } from "./components/order/OrderSummary"
 import { SavedOrdersModal } from "./components/order/SavedOrdersModal"
 import { PaymentModal } from "./components/payment/PaymentModal"
 import { ReceiptModal } from "./components/payment/ReceiptModal"
-import { categories } from "./data/dummy"
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   createOrder,
+  fetchMenuCategories,
   fetchMenuItems,
   fetchOrders,
   payOrder,
@@ -50,6 +50,11 @@ function App() {
   const menuItemsQuery = useQuery({
     queryKey: ["menu-items", DEV_COMPANY_ID],
     queryFn: () => fetchMenuItems(DEV_COMPANY_ID),
+  })
+
+  const menuCategoriesQuery = useQuery({
+    queryKey: ["menu-categories", DEV_COMPANY_ID],
+    queryFn: () => fetchMenuCategories(DEV_COMPANY_ID),
   })
 
   const openOrdersQuery = useQuery({
@@ -224,7 +229,13 @@ function App() {
   }
 
   const products = menuItemsQuery.data ?? []
-
+  const categoryTabs = [
+    { id: "ALL", name: "ALL" },
+    ...(menuCategoriesQuery.data ?? []).map((cat) => ({
+      id: cat.id,
+      name: cat.name,
+    })),
+  ]
 
   const filteredProducts = products.filter((product) => {
     const q = searchQuery.trim().toLowerCase()
@@ -236,12 +247,7 @@ function App() {
     if (!matchesSearch) return false
 
     if (activeCategory === "ALL") return true
-    if (activeCategory === "FOOD") return product.sku.toUpperCase().startsWith("FD")
-    if (activeCategory === "DRINK") return product.sku.toUpperCase().startsWith("DR")
-    if (activeCategory === "SNACK") return product.sku.toUpperCase().startsWith("SN")
-    if (activeCategory === "DESSERT") return product.sku.toUpperCase().startsWith("DS")
-
-    return true
+    return product.categoryIds?.includes(activeCategory)
   })
 
   const subtotal = orderItems.reduce(
@@ -284,8 +290,8 @@ function App() {
 
             <div className="border-b border-slate-200 bg-white px-4 py-3">
               <CategoryTabs
-                categories={categories}
-                activeCategory={activeCategory}
+                categories={categoryTabs}
+                activeCategoryId={activeCategory}
                 onSelectCategory={setActiveCategory}
               />
             </div>
