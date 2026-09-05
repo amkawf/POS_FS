@@ -9,23 +9,34 @@ import { SavedOrdersModal } from "./components/order/SavedOrdersModal"
 import { TableSelectModal } from "./components/table/TableSelectModal"
 import { PaymentModal } from "./components/payment/PaymentModal"
 import { ReceiptModal } from "./components/payment/ReceiptModal"
+import { DashboardView } from "./views/DashboardView"
+import { TablesView } from "./views/TablesView"
+import { KitchenView } from "./views/KitchenView"
+import { PaymentsView } from "./views/PaymentsView"
+import { InventoryView } from "./views/InventoryView"
+import { ReportsView } from "./views/ReportsView"
+import { EmployeesView } from "./views/EmployeesView"
+import { SettingsView } from "./views/SettingsView"
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   createOrder,
   fetchMenuCategories,
   fetchMenuItems,
+  fetchOrderById,
   fetchOrders,
   fetchTables,
   payOrder,
   type OrderResponse,
 } from "./api/client"
 import { DEV_COMPANY_ID, DEV_STORE_ID } from "./config"
+import type { PosView } from "./types/navigation"
 import type { OrderItem, Product, Table } from "./types/pos"
 import { Button } from "@mantine/core"
 import { Table2 } from "lucide-react"
 
 function App() {
+  const [currentView, setCurrentView] = useState<PosView>("ORDERS")
   const [orderItems, setOrderItems] = useState<OrderItem[]>([])
   const [lastOrderNumber, setLastOrderNumber] = useState<string | null>(null)
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null)
@@ -76,7 +87,16 @@ function App() {
     refetchInterval: 15000,
   })
 
-  const openOrdersCount = openOrdersQuery.data?.length ?? 0
+  const completedOrdersQuery = useQuery({
+    queryKey: ["orders", DEV_COMPANY_ID, DEV_STORE_ID, "COMPLETED"],
+    queryFn: () => fetchOrders(DEV_COMPANY_ID, DEV_STORE_ID, "COMPLETED"),
+    refetchInterval: 15000,
+  })
+
+  const openOrders = openOrdersQuery.data ?? []
+  const completedOrders = completedOrdersQuery.data ?? []
+  const allOrders = [...openOrders, ...completedOrders]
+  const openOrdersCount = openOrders.length
 
   const createOrderMutation = useMutation({
     mutationFn: createOrder,
@@ -103,6 +123,63 @@ function App() {
     }
     setOrderItems(items)
     setSuccessMessage(`Order #${order.order_number} loaded into checkout. Ready to PAY!`)
+  }
+
+  const handleLoadOrderFromDashboard = async (order: OrderResponse) => {
+    try {
+      const fullOrder = await fetchOrderById(
+        order.id,
+        DEV_COMPANY_ID,
+        DEV_STORE_ID,
+      )
+      const items: OrderItem[] = (fullOrder.items ?? []).map((item) => ({
+        menuItemId: item.menu_item_id,
+        sku: item.sku,
+        name: item.item_name,
+        price: item.unit_price,
+        qty: item.quantity,
+      }))
+      handleSelectSavedOrder(fullOrder, items)
+      setCurrentView("ORDERS")
+    } catch (err) {
+      alert(`Gagal memuat pesanan: ${(err as Error).message}`)
+    }
+  }
+
+  const handleOpenReceiptFromPayment = async (order: OrderResponse) => {
+    try {
+      const fullOrder = await fetchOrderById(
+        order.id,
+        DEV_COMPANY_ID,
+        DEV_STORE_ID,
+      )
+      const items: OrderItem[] = (fullOrder.items ?? []).map((item) => ({
+        menuItemId: item.menu_item_id,
+        sku: item.sku,
+        name: item.item_name,
+        price: item.unit_price,
+        qty: item.quantity,
+      }))
+      const targetTableNumber =
+        fullOrder.table_id
+          ? tables.find((t) => t.id === fullOrder.table_id)?.table_number
+          : undefined
+
+      setReceiptData({
+        orderNumber: fullOrder.order_number,
+        orderType: fullOrder.order_type,
+        tableNumber: targetTableNumber,
+        items,
+        subtotal: fullOrder.subtotal,
+        totalAmount: fullOrder.total_amount,
+        paymentMethod: "CASH",
+        amountPaid: fullOrder.total_amount,
+        change: 0,
+      })
+      setReceiptModalOpen(true)
+    } catch (err) {
+      alert(`Gagal memuat data struk: ${(err as Error).message}`)
+    }
   }
 
   const increaseItem = (index: number) => {
@@ -298,11 +375,12 @@ function App() {
 
       <div className="flex min-h-[calc(100vh-4rem)]">
         <Sidebar
-          onOpenOrders={() => setSavedOrdersModalOpen(true)}
-          onOpenTables={() => setTableModalOpen(true)}
+          activeView={currentView}
+          onViewChange={setCurrentView}
         />
 
-        <main className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_380px]">
+        {currentView === "ORDERS" && (
+          <main className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_380px]">
           <section className="min-w-0 border-r border-slate-200">
             <div className="flex h-14 items-center justify-between border-b border-slate-200 bg-white px-4">
               <div>
@@ -495,6 +573,66 @@ function App() {
             />
           </aside>
         </main>
+        )}
+
+        {currentView === "DASHBOARD" && (
+          <DashboardView
+            openOrders={openOrders}
+            completedOrders={completedOrders}
+            tables={tables}
+            menuItemsCount={products.length}
+            onNavigateToOrders={() => setCurrentView("ORDERS")}
+            onSelectOrder={handleLoadOrderFromDashboard}
+          />
+        )}
+
+        {currentView === "TABLES" && (
+          <TablesView
+            tables={tables}
+            selectedTableId={selectedTable?.id ?? null}
+            onSelectTableForOrder={(table) => {
+              setSelectedTable(table)
+              setOrderType("DINE_IN")
+              setCurrentView("ORDERS")
+            }}
+          />
+        )}
+
+        {currentView === "KITCHEN" && (
+          <KitchenView
+            orders={allOrders}
+            tables={tables}
+          />
+        )}
+
+        {currentView === "PAYMENTS" && (
+          <PaymentsView
+            completedOrders={completedOrders}
+            tables={tables}
+            onOpenReceipt={handleOpenReceiptFromPayment}
+          />
+        )}
+
+        {currentView === "INVENTORY" && (
+          <InventoryView
+            products={products}
+            categories={menuCategoriesQuery.data ?? []}
+          />
+        )}
+
+        {currentView === "REPORTS" && (
+          <ReportsView
+            completedOrders={completedOrders}
+          />
+        )}
+
+        {currentView === "EMPLOYEES" && (
+          <EmployeesView />
+        )}
+
+        {currentView === "SETTINGS" && (
+          <SettingsView />
+        )}
       </div>
 
       <SavedOrdersModal

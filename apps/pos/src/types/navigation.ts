@@ -1,0 +1,10 @@
+export type PosView =
+  | "ORDERS"
+  | "DASHBOARD"
+  | "TABLES"
+  | "KITCHEN"
+  | "PAYMENTS"
+  | "INVENTORY"
+  | "REPORTS"
+  | "EMPLOYEES"
+  | "SETTINGS"
