@@ -241,3 +241,82 @@ export async function deleteOrder(
   return response.json()
 }
 
+export type KitchenTicketItemResponse = {
+  id: string
+  ticket_id: string
+  order_item_id?: string
+  menu_item_id: string
+  item_name: string
+  sku: string
+  quantity: number
+  notes?: string
+  status: "PENDING" | "PREPARING" | "READY" | "SERVED" | "CANCELLED"
+  created_at: string
+  updated_at: string
+}
+
+export type KitchenTicketResponse = {
+  id: string
+  company_id: string
+  store_id: string
+  order_id: string
+  order_number: string
+  order_type: string
+  table_id?: string
+  table_number?: string
+  status: "PENDING" | "PREPARING" | "READY" | "SERVED" | "CANCELLED"
+  priority: "NORMAL" | "RUSH" | "VIP"
+  notes?: string
+  items: KitchenTicketItemResponse[]
+  created_at: string
+  updated_at: string
+  started_at?: string
+  ready_at?: string
+  served_at?: string
+}
+
+export async function fetchKitchenTickets(
+  companyId: string,
+  storeId: string,
+  status?: string,
+): Promise<KitchenTicketResponse[]> {
+  const url = new URL(`${API_BASE_URL}/kitchen/tickets`)
+  url.searchParams.set("company_id", companyId)
+  url.searchParams.set("store_id", storeId)
+  if (status && status !== "ALL") {
+    url.searchParams.set("status", status)
+  }
+
+  const response = await fetch(url)
+  if (!response.ok) {
+    await parseErrorResponse(response)
+  }
+
+  const data: { tickets: KitchenTicketResponse[] } = await response.json()
+  return data.tickets
+}
+
+export type UpdateKitchenTicketStatusPayload = {
+  company_id: string
+  store_id: string
+  status: "PENDING" | "PREPARING" | "READY" | "SERVED" | "CANCELLED"
+}
+
+export async function updateKitchenTicketStatus(
+  id: string,
+  payload: UpdateKitchenTicketStatusPayload,
+): Promise<KitchenTicketResponse> {
+  const response = await fetch(`${API_BASE_URL}/kitchen/tickets/${id}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    await parseErrorResponse(response)
+  }
+
+  return response.json()
+}
+
+
