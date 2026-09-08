@@ -161,6 +161,7 @@ export function App() {
         sku: item.sku,
         quantity: item.qty,
         unit_price: item.price,
+        notes: item.notes || null,
       })),
     })
   }
@@ -196,6 +197,7 @@ export function App() {
         name: item.item_name,
         price: item.unit_price,
         qty: item.quantity,
+        notes: item.notes ?? undefined,
       }))
       const targetTableNumber = fullOrder.table_id
         ? tables.find((t) => t.id === fullOrder.table_id)?.table_number
@@ -243,6 +245,7 @@ export function App() {
             sku: item.sku,
             quantity: item.qty,
             unit_price: item.price,
+            notes: item.notes || null,
           })),
         })
         targetOrderId = created.id
@@ -423,6 +426,7 @@ export function App() {
         onIncrease={cart.increaseItem}
         onDecrease={cart.decreaseItem}
         onRemove={cart.removeItem}
+        onUpdateNotes={cart.updateItemNotes}
       />
 
       {/* Pricing Summary */}

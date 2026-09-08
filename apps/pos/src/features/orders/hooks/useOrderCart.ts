@@ -61,6 +61,14 @@ export function useOrderCart() {
     )
   }
 
+  const updateItemNotes = (index: number, notes: string) => {
+    setOrderItems((currentItems) => 
+     currentItems.map((item, itemIndex) =>
+      itemIndex === index ? {...item, notes} : item,
+    ),
+   )
+  }
+
   const clearCart = () => {
     setOrderItems([])
     setActiveOrderId(null)
@@ -110,6 +118,7 @@ export function useOrderCart() {
     increaseItem,
     decreaseItem,
     removeItem,
+    updateItemNotes,
     clearCart,
     loadSavedOrder,
     itemCount,

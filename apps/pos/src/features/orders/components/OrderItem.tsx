@@ -1,12 +1,15 @@
+import { useState } from "react"
 import { Minus, Plus, Trash2 } from "lucide-react"
 import type { OrderItem as OrderItemType } from "../../../types/pos"
 import { formatPrice } from "../../../utils/currency"
+
 
 type OrderItemProps = {
   item: OrderItemType
   onIncrease: () => void
   onDecrease: () => void
   onRemove: () => void
+  onUpdateNotes: (notes: string) => void
 }
 
 export function OrderItem({
@@ -14,8 +17,10 @@ export function OrderItem({
   onIncrease,
   onDecrease,
   onRemove,
+  onUpdateNotes,
 }: OrderItemProps) {
   const itemTotal = item.price * item.qty
+  const [isEditingNote, setIsEditingNote] = useState(false)
 
   return (
     <div className="border-b border-slate-100 p-3 transition-colors hover:bg-slate-50/60">
@@ -34,6 +39,28 @@ export function OrderItem({
           Rp {formatPrice(itemTotal)}
         </div>
       </div>
+
+      {item.notes || isEditingNote ? (
+      <div className="mt-1.5">
+        <input
+         type="text"
+         value={item.notes || ""}
+         onChange={(e) => onUpdateNotes(e.target.value)}
+         placeholder="Catatan (i.e: pedas, sedang, dll"
+         className="w-full rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-700 placeholder-slate-400 focus:border-blue-500 focus:bg-white focus:outline-hidden"
+         autoFocus={isEditingNote && !item.notes}
+        />
+      </div>
+      ) : (
+        <button
+        type="button"
+        onClick={() => setIsEditingNote(true)}
+        className="mt-1 text-[10px] font-medium text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
+        >
+          + Tambah Catatan
+        </button>
+      )}
+
 
       <div className="mt-2.5 flex items-center">
         <div className="flex items-center rounded-lg border border-slate-200 bg-white p-0.5 shadow-2xs">

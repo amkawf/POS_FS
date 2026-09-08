@@ -16,6 +16,9 @@ RUN pnpm --filter pos build
 # stage 2
 FROM nginx:alpine
 
+# Salin konfigurasi Nginx resepsionis kita
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
 #copy ke web root nginx
 COPY --from=builder /app/apps/pos/dist /usr/share/nginx/html
 

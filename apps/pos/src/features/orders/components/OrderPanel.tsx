@@ -7,6 +7,7 @@ type OrderPanelProps = {
   onIncrease: (index: number) => void
   onDecrease: (index: number) => void
   onRemove: (index: number) => void
+  onUpdateNotes: (index: number, notes: string) => void
 }
 
 export function OrderPanel({
@@ -14,6 +15,7 @@ export function OrderPanel({
   onIncrease,
   onDecrease,
   onRemove,
+  onUpdateNotes,
 }: OrderPanelProps) {
   if (items.length === 0) {
     return (
@@ -40,6 +42,7 @@ export function OrderPanel({
           onIncrease={() => onIncrease(index)}
           onDecrease={() => onDecrease(index)}
           onRemove={() => onRemove(index)}
+          onUpdateNotes={(notes) => onUpdateNotes(index, notes)}
         />
       ))}
     </div>

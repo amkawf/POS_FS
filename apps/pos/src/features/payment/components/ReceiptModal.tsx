@@ -99,6 +99,11 @@ export function ReceiptModal({
           {items.map((it, idx) => (
             <div key={idx}>
               <div className="font-bold text-slate-900">{it.name}</div>
+              {it.notes && (
+                <div className="text-[10px] italic text-slate-500">
+                  * {it.notes}
+                </div>
+              )}
               <div className="flex justify-between text-slate-600">
                 <span>
                   {it.qty} x Rp {formatPrice(it.price)}

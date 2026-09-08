@@ -98,6 +98,7 @@ export type CreateOrderItemPayload = {
   sku: string
   quantity: number
   unit_price: number
+  notes?: string | null
 }
 
 export type CreateOrderPayload = {

@@ -28,4 +28,5 @@ export type OrderItem = {
   name: string
   price: number
   qty: number
+  notes?: string
 }
