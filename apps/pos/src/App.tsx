@@ -1,24 +1,40 @@
-import { Sidebar } from "./components/SideBar"
-import { TopBar } from "./components/TopBar"
-import { CategoryTabs } from "./components/catalog/CategoryTabs"
-import { ProductGrid } from "./components/catalog/ProductGrid"
-import { OrderActions } from "./components/order/OrderAction"
-import { OrderPanel } from "./components/order/OrderPanel"
-import { OrderSummary } from "./components/order/OrderSummary"
-import { SavedOrdersModal } from "./components/order/SavedOrdersModal"
-import { TableSelectModal } from "./components/table/TableSelectModal"
-import { PaymentModal } from "./components/payment/PaymentModal"
-import { ReceiptModal } from "./components/payment/ReceiptModal"
-import { DashboardView } from "./views/DashboardView"
-import { TablesView } from "./views/TablesView"
-import { KitchenView } from "./views/KitchenView"
-import { PaymentsView } from "./views/PaymentsView"
-import { InventoryView } from "./views/InventoryView"
-import { ReportsView } from "./views/ReportsView"
-import { EmployeesView } from "./views/EmployeesView"
-import { SettingsView } from "./views/SettingsView"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { Table2 } from "lucide-react"
+
+// Layout Components
+import { MobileNavDrawer, Sidebar, TopBar } from "./components/layout"
+
+// Feature: Catalog
+import { CategoryTabs, ProductGrid } from "./features/catalog"
+
+// Feature: Orders & Cart
+import {
+  CartDrawer,
+  CartFloatingBar,
+  OrderActions,
+  OrderPanel,
+  OrderSummary,
+  SavedOrdersModal,
+  useOrderCart,
+} from "./features/orders"
+
+// Feature: Tables & Dine-In
+import { TableSelectModal, TablesView } from "./features/tables"
+
+// Feature: Payment & Receipts
+import { PaymentModal, ReceiptModal } from "./features/payment"
+
+// Other Views
+import { DashboardView } from "./features/dashboard"
+import { KitchenView } from "./features/kitchen"
+import { PaymentsView } from "./features/payments-history"
+import { InventoryView } from "./features/inventory"
+import { ReportsView } from "./features/reports"
+import { EmployeesView } from "./features/employees"
+import { SettingsView } from "./features/settings"
+
+// API, Config & Types
 import {
   createOrder,
   fetchMenuCategories,
@@ -27,26 +43,23 @@ import {
   fetchOrders,
   fetchTables,
   payOrder,
+  updateTableStatus,
   type OrderResponse,
-} from "./api/client"
+} from "./api"
 import { DEV_COMPANY_ID, DEV_STORE_ID } from "./config"
 import type { PosView } from "./types/navigation"
-import type { OrderItem, Product, Table } from "./types/pos"
-import { Button } from "@mantine/core"
-import { Table2 } from "lucide-react"
+import type { OrderItem } from "./types/pos"
 
-function App() {
+export function App() {
   const [currentView, setCurrentView] = useState<PosView>("ORDERS")
-  const [orderItems, setOrderItems] = useState<OrderItem[]>([])
-  const [lastOrderNumber, setLastOrderNumber] = useState<string | null>(null)
-  const [activeOrderId, setActiveOrderId] = useState<string | null>(null)
-  const [savedOrdersModalOpen, setSavedOrdersModalOpen] = useState(false)
-  const [tableModalOpen, setTableModalOpen] = useState(false)
-  const [selectedTable, setSelectedTable] = useState<Table | null>(null)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [activeCategory, setActiveCategory] = useState("ALL")
-  const [orderType, setOrderType] = useState<"DINE_IN" | "TAKEAWAY">("DINE_IN")
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+
+  // Modals state
+  const [savedOrdersModalOpen, setSavedOrdersModalOpen] = useState(false)
+  const [tableModalOpen, setTableModalOpen] = useState(false)
   const [paymentModalOpen, setPaymentModalOpen] = useState(false)
   const [receiptModalOpen, setReceiptModalOpen] = useState(false)
   const [isProcessingPayment, setIsProcessingPayment] = useState(false)
@@ -62,8 +75,11 @@ function App() {
     change: number
   } | null>(null)
 
+  // Pure Cart Hook
+  const cart = useOrderCart()
   const queryClient = useQueryClient()
 
+  // Queries
   const menuItemsQuery = useQuery({
     queryKey: ["menu-items", DEV_COMPANY_ID],
     queryFn: () => fetchMenuItems(DEV_COMPANY_ID),
@@ -79,8 +95,6 @@ function App() {
     queryFn: () => fetchTables(DEV_COMPANY_ID, DEV_STORE_ID),
   })
 
-  const tables = tablesQuery.data ?? []
-
   const openOrdersQuery = useQuery({
     queryKey: ["orders", DEV_COMPANY_ID, DEV_STORE_ID, "OPEN"],
     queryFn: () => fetchOrders(DEV_COMPANY_ID, DEV_STORE_ID, "OPEN"),
@@ -93,45 +107,72 @@ function App() {
     refetchInterval: 15000,
   })
 
+  const tables = tablesQuery.data ?? []
   const openOrders = openOrdersQuery.data ?? []
   const completedOrders = completedOrdersQuery.data ?? []
   const allOrders = [...openOrders, ...completedOrders]
-  const openOrdersCount = openOrders.length
+  const products = menuItemsQuery.data ?? []
 
+  // Auto-dismiss notification timer
+  useEffect(() => {
+    if (!successMessage) return
+    const timer = setTimeout(() => setSuccessMessage(null), 5000)
+    return () => clearTimeout(timer)
+  }, [successMessage])
+
+  // Create Order Mutation
   const createOrderMutation = useMutation({
     mutationFn: createOrder,
     onSuccess: (result) => {
-      setOrderItems([])
-      setActiveOrderId(null)
-      setSelectedTable(null)
-      setLastOrderNumber(result.order_number)
-      setSuccessMessage(`Order #${result.order_number} saved successfully!`)
+      const savedTableName = cart.selectedTable?.table_number
+      cart.clearCart()
+      cart.setLastOrderNumber(result.order_number)
+      cart.setCartDrawerOpen(false)
+
+      if (savedTableName) {
+        setSuccessMessage(`Pesanan disimpan ke Meja ${savedTableName} (#${result.order_number})! Meja kini terisi.`)
+      } else {
+        setSuccessMessage(`Pesanan #${result.order_number} berhasil disimpan!`)
+      }
       queryClient.invalidateQueries({ queryKey: ["menu-items"] })
       queryClient.invalidateQueries({ queryKey: ["orders"] })
+      queryClient.invalidateQueries({ queryKey: ["tables"] })
     },
   })
 
-  const handleSelectSavedOrder = (order: OrderResponse, items: OrderItem[]) => {
-    setActiveOrderId(order.id)
-    setLastOrderNumber(order.order_number)
-    setOrderType(order.order_type as "DINE_IN" | "TAKEAWAY")
-    if (order.table_id) {
-      const foundTable = tables.find((t) => t.id === order.table_id) ?? null
-      setSelectedTable(foundTable)
-    } else {
-      setSelectedTable(null)
+  // Handlers
+  const handleSaveOrder = () => {
+    if (cart.orderItems.length === 0) return
+
+    if (cart.orderType === "DINE_IN" && !cart.selectedTable) {
+      setTableModalOpen(true)
+      return
     }
-    setOrderItems(items)
-    setSuccessMessage(`Order #${order.order_number} loaded into checkout. Ready to PAY!`)
+
+    createOrderMutation.mutate({
+      company_id: DEV_COMPANY_ID,
+      store_id: DEV_STORE_ID,
+      table_id: cart.orderType === "DINE_IN" ? cart.selectedTable?.id : undefined,
+      order_type: cart.orderType,
+      order_source: "POS",
+      items: cart.orderItems.map((item) => ({
+        menu_item_id: item.menuItemId,
+        item_name: item.name,
+        sku: item.sku,
+        quantity: item.qty,
+        unit_price: item.price,
+      })),
+    })
+  }
+
+  const handleSelectSavedOrder = (order: OrderResponse, items: OrderItem[]) => {
+    cart.loadSavedOrder(order, items, tables)
+    setSuccessMessage(`Order #${order.order_number} dimuat ke kasir. Siap dibayar!`)
   }
 
   const handleLoadOrderFromDashboard = async (order: OrderResponse) => {
     try {
-      const fullOrder = await fetchOrderById(
-        order.id,
-        DEV_COMPANY_ID,
-        DEV_STORE_ID,
-      )
+      const fullOrder = await fetchOrderById(order.id, DEV_COMPANY_ID, DEV_STORE_ID)
       const items: OrderItem[] = (fullOrder.items ?? []).map((item) => ({
         menuItemId: item.menu_item_id,
         sku: item.sku,
@@ -148,11 +189,7 @@ function App() {
 
   const handleOpenReceiptFromPayment = async (order: OrderResponse) => {
     try {
-      const fullOrder = await fetchOrderById(
-        order.id,
-        DEV_COMPANY_ID,
-        DEV_STORE_ID,
-      )
+      const fullOrder = await fetchOrderById(order.id, DEV_COMPANY_ID, DEV_STORE_ID)
       const items: OrderItem[] = (fullOrder.items ?? []).map((item) => ({
         menuItemId: item.menu_item_id,
         sku: item.sku,
@@ -160,10 +197,9 @@ function App() {
         price: item.unit_price,
         qty: item.quantity,
       }))
-      const targetTableNumber =
-        fullOrder.table_id
-          ? tables.find((t) => t.id === fullOrder.table_id)?.table_number
-          : undefined
+      const targetTableNumber = fullOrder.table_id
+        ? tables.find((t) => t.id === fullOrder.table_id)?.table_number
+        : undefined
 
       setReceiptData({
         orderNumber: fullOrder.order_number,
@@ -182,104 +218,26 @@ function App() {
     }
   }
 
-  const increaseItem = (index: number) => {
-    setOrderItems((currentItems) =>
-      currentItems.map((item, itemIndex) =>
-        itemIndex === index
-          ? { ...item, qty: item.qty + 1 }
-          : item,
-      ),
-    )
-  }
-
-  const decreaseItem = (index: number) => {
-    setOrderItems((currentItems) =>
-      currentItems.map((item, itemIndex) =>
-        itemIndex === index && item.qty > 1
-          ? { ...item, qty: item.qty - 1 }
-          : item,
-      ),
-    )
-  }
-
-  const removeItem = (index: number) => {
-    setOrderItems((currentItems) =>
-      currentItems.filter((_, itemIndex) => itemIndex !== index),
-    )
-  }
-
-  const addProduct = (product: Product) => {
-    setSuccessMessage(null)
-    setOrderItems((currentItems) => {
-      const existingItem = currentItems.find(
-        (item) => item.menuItemId === product.id,
-      )
-
-      if (existingItem) {
-        return currentItems.map((item) =>
-          item.menuItemId === product.id
-            ? { ...item, qty: item.qty + 1 }
-            : item,
-        )
-      }
-
-      return [
-        ...currentItems,
-        {
-          menuItemId: product.id,
-          sku: product.sku,
-          name: product.name,
-          price: product.price,
-          qty: 1,
-        },
-      ]
-    })
-  }
-
-  const handleSaveOrder = () => {
-    if (orderItems.length === 0) {
-      return
-    }
-
-    createOrderMutation.mutate({
-      company_id: DEV_COMPANY_ID,
-      store_id: DEV_STORE_ID,
-      table_id: orderType === "DINE_IN" ? selectedTable?.id : undefined,
-      order_type: orderType,
-      order_source: "POS",
-      items: orderItems.map((item) => ({
-        menu_item_id: item.menuItemId,
-        item_name: item.name,
-        sku: item.sku,
-        quantity: item.qty,
-        unit_price: item.price,
-      })),
-    })
-  }
-
-  const handleConfirmPayment = async (
-    paymentMethod: "CASH" | "QRIS",
-    amountPaid: number,
-  ) => {
-    if (orderItems.length === 0) return
+  const handleConfirmPayment = async (paymentMethod: "CASH" | "QRIS", amountPaid: number) => {
+    if (cart.orderItems.length === 0) return
 
     setIsProcessingPayment(true)
     try {
-      let targetOrderId = activeOrderId
-      let targetOrderNumber = lastOrderNumber
-      const targetOrderType = orderType
-      const finalSubtotal = subtotal
-      const finalTotal = total
+      let targetOrderId = cart.activeOrderId
+      let targetOrderNumber = cart.lastOrderNumber
+      const targetOrderType = cart.orderType
+      const finalSubtotal = cart.subtotal
+      const finalTotal = cart.total
 
-      // 1. If this is a fresh order in cart (not saved previously), create it first
+      // 1. Create order if fresh cart
       if (!targetOrderId) {
         const created = await createOrder({
           company_id: DEV_COMPANY_ID,
           store_id: DEV_STORE_ID,
-          table_id: orderType === "DINE_IN" ? selectedTable?.id : undefined,
-          order_type: orderType,
+          table_id: cart.orderType === "DINE_IN" ? cart.selectedTable?.id : undefined,
+          order_type: cart.orderType,
           order_source: "POS",
-          items: orderItems.map((item) => ({
+          items: cart.orderItems.map((item) => ({
             menu_item_id: item.menuItemId,
             item_name: item.name,
             sku: item.sku,
@@ -301,7 +259,7 @@ function App() {
 
       // 3. Setup receipt data
       const targetTableNumber =
-        selectedTable?.table_number ||
+        cart.selectedTable?.table_number ||
         (paidOrder.table_id ? tables.find((t) => t.id === paidOrder.table_id)?.table_number : undefined)
 
       const changeAmount = amountPaid - paidOrder.total_amount
@@ -309,7 +267,7 @@ function App() {
         orderNumber: paidOrder.order_number || targetOrderNumber || "ORD-DONE",
         orderType: paidOrder.order_type || targetOrderType,
         tableNumber: targetTableNumber,
-        items: [...orderItems],
+        items: [...cart.orderItems],
         subtotal: paidOrder.subtotal || finalSubtotal,
         totalAmount: paidOrder.total_amount || finalTotal,
         paymentMethod,
@@ -317,15 +275,13 @@ function App() {
         change: changeAmount,
       })
 
-      // 4. Invalidate queries & reset cart
+      // 4. Invalidate & reset
       queryClient.invalidateQueries({ queryKey: ["orders"] })
       queryClient.invalidateQueries({ queryKey: ["tables"] })
       setPaymentModalOpen(false)
+      cart.setCartDrawerOpen(false)
       setReceiptModalOpen(true)
-      setOrderItems([])
-      setActiveOrderId(null)
-      setSelectedTable(null)
-      setLastOrderNumber(null)
+      cart.clearCart()
       setSuccessMessage(null)
     } catch (err) {
       alert(`Pembayaran gagal: ${(err as Error).message}`)
@@ -334,7 +290,7 @@ function App() {
     }
   }
 
-  const products = menuItemsQuery.data ?? []
+  // Filter Catalog Products
   const categoryTabs = [
     { id: "ALL", name: "ALL" },
     ...(menuCategoriesQuery.data ?? []).map((cat) => ({
@@ -351,228 +307,263 @@ function App() {
       product.sku.toLowerCase().includes(q)
 
     if (!matchesSearch) return false
-
     if (activeCategory === "ALL") return true
     return product.categoryIds?.includes(activeCategory)
   })
 
-  const subtotal = orderItems.reduce(
-    (total, item) => total + item.price * item.qty,
-    0,
+  // Shared Cart & Checkout Panel UI (used in both desktop sidebar & mobile drawer)
+  const renderCartContent = () => (
+    <>
+      {successMessage && (
+        <div className="mx-3 mt-3 flex shrink-0 items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 shadow-2xs">
+          <div className="flex min-w-0 items-center gap-2 pr-1">
+            <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[9px] font-bold text-white shadow-2xs">
+              ✓
+            </span>
+            <span className="truncate" title={successMessage}>{successMessage}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSuccessMessage(null)}
+            className="ml-2 shrink-0 font-bold text-emerald-700 hover:text-emerald-950 cursor-pointer"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {/* Header: Order Info + DINE IN / TAKEAWAY Toggle */}
+      <div className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 px-4">
+        <div className="min-w-0 flex-1 pr-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="shrink-0 text-sm font-extrabold uppercase tracking-tight text-slate-900">
+              Current Order
+            </span>
+            {cart.activeOrderId && (
+              <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-emerald-700">
+                RECALLED
+              </span>
+            )}
+          </div>
+
+          <div className="mt-0.5 flex min-w-0 items-center gap-2 text-[10px] font-medium text-slate-400">
+            <span
+              className="truncate max-w-30"
+              title={cart.lastOrderNumber ? `Order: ${cart.lastOrderNumber}` : "New Order"}
+            >
+              {cart.lastOrderNumber ? `#${cart.lastOrderNumber}` : "New Order"}
+            </span>
+            <span className="text-slate-300">•</span>
+          </div>
+        </div>
+
+        <div className="flex shrink-0 rounded-lg border border-slate-200 bg-slate-100 p-0.5">
+          <button
+            type="button"
+            onClick={() => cart.setOrderType("DINE_IN")}
+            className={`rounded-md px-2.5 py-1 text-[10px] font-bold whitespace-nowrap transition-all duration-200 active:scale-[0.98] cursor-pointer ${
+              cart.orderType === "DINE_IN"
+                ? "bg-blue-600 text-white shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            DINE IN
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              cart.setOrderType("TAKEAWAY")
+              cart.setSelectedTable(null)
+            }}
+            className={`rounded-md px-2.5 py-1 text-[10px] font-bold whitespace-nowrap transition-all duration-200 active:scale-[0.98] cursor-pointer ${
+              cart.orderType === "TAKEAWAY"
+                ? "bg-blue-600 text-white shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            TAKEAWAY
+          </button>
+        </div>
+      </div>
+
+      {/* Dine In Table Selector Strip */}
+      {cart.orderType === "DINE_IN" && (
+        <div className="flex items-center justify-between border-b border-blue-100 bg-blue-50/60 px-4 py-2">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+            <Table2 size={14} strokeWidth={2} className="text-blue-600" />
+            <span className="text-slate-500 font-medium">Meja:</span>
+            <span
+              className={
+                cart.selectedTable
+                  ? "font-extrabold text-blue-700"
+                  : "font-normal italic text-slate-400"
+              }
+            >
+              {cart.selectedTable ? cart.selectedTable.table_number : "Belum dipilih"}
+            </span>
+            {cart.selectedTable && (
+              <span className="text-[10px] font-medium text-slate-400">
+                ({cart.selectedTable.capacity} Kursi)
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setTableModalOpen(true)}
+            className="rounded-lg border border-blue-200/80 bg-white px-2.5 py-1 text-[11px] font-bold text-blue-600 shadow-2xs transition-all duration-200 hover:bg-blue-50 active:scale-[0.98] cursor-pointer"
+          >
+            {cart.selectedTable ? "Ganti" : "Pilih Meja"}
+          </button>
+        </div>
+      )}
+
+      {/* Cart Items List */}
+      <OrderPanel
+        items={cart.orderItems}
+        onIncrease={cart.increaseItem}
+        onDecrease={cart.decreaseItem}
+        onRemove={cart.removeItem}
+      />
+
+      {/* Pricing Summary */}
+      <OrderSummary
+        subtotal={cart.subtotal}
+        tax={cart.tax}
+        total={cart.total}
+      />
+
+      {createOrderMutation.isError && (
+        <div className="border-t border-red-200 bg-red-50 p-2 text-xs font-semibold text-red-600">
+          Failed to save order: {(createOrderMutation.error as Error).message}
+        </div>
+      )}
+
+      {/* Cart Action Buttons */}
+      <OrderActions
+        total={cart.total}
+        disabled={cart.orderItems.length === 0 || createOrderMutation.isPending || isProcessingPayment}
+        isSaving={createOrderMutation.isPending}
+        saveLabel={
+          cart.orderType === "DINE_IN"
+            ? (cart.selectedTable ? `Simpan Meja ${cart.selectedTable.table_number}` : "Simpan Meja")
+            : "Simpan Pesanan"
+        }
+        onSaveOrder={handleSaveOrder}
+        onPayOrder={() => setPaymentModalOpen(true)}
+        onClearOrder={() => {
+          cart.clearCart()
+          setSuccessMessage(null)
+        }}
+      />
+    </>
   )
 
-  const tax = subtotal * 0.1
-  const total = subtotal + tax
-
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
+      {/* TopBar */}
       <TopBar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onOpenSavedOrders={() => setSavedOrdersModalOpen(true)}
-        openOrdersCount={openOrdersCount}
+        openOrdersCount={openOrders.length}
+        onToggleMobileNav={() => setMobileNavOpen(true)}
+        cartItemCount={cart.itemCount}
+        onOpenMobileCart={() => cart.setCartDrawerOpen(true)}
+        currentView={currentView}
       />
 
-      <div className="flex min-h-[calc(100vh-4rem)]">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* Desktop Persistent Sidebar */}
         <Sidebar
           activeView={currentView}
           onViewChange={setCurrentView}
         />
 
+        {/* Mobile Navigation Drawer */}
+        <MobileNavDrawer
+          opened={mobileNavOpen}
+          onClose={() => setMobileNavOpen(false)}
+          activeView={currentView}
+          onViewChange={setCurrentView}
+        />
+
+        {/* View Content Area */}
         {currentView === "ORDERS" && (
-          <main className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_380px]">
-          <section className="min-w-0 border-r border-slate-200">
-            <div className="flex h-14 items-center justify-between border-b border-slate-200 bg-white px-4">
-              <div>
-                <div className="text-sm font-extrabold uppercase tracking-tight">
-                  Product Catalog
+          <main className="flex min-w-0 flex-1 overflow-hidden">
+            {/* Catalog Section */}
+            <section className="flex min-w-0 flex-1 flex-col overflow-y-auto border-r border-slate-200 bg-slate-50/30 pb-20 lg:pb-0">
+              <div className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-5">
+                <div>
+                  <div className="text-sm font-extrabold uppercase tracking-tight text-slate-900">
+                    Katalog Produk
+                  </div>
+                  <div className="mt-0.5 font-mono text-[10px] font-semibold tracking-wider text-slate-400">
+                    {filteredProducts.length} DARI {products.length} PRODUK TERSEDIA
+                  </div>
                 </div>
 
-                <div className="mt-0.5 text-[10px] font-semibold text-slate-400">
-                  {filteredProducts.length} OF {products.length} PRODUCTS AVAILABLE
+                <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 shadow-2xs">
+                  STORE STOCK
+                </span>
+              </div>
+
+              <div className="border-b border-slate-200 bg-white px-4 py-2.5">
+                <CategoryTabs
+                  categories={categoryTabs}
+                  activeCategoryId={activeCategory}
+                  onSelectCategory={setActiveCategory}
+                />
+              </div>
+
+              {menuItemsQuery.isLoading && (
+                <div className="p-6 text-xs font-semibold text-slate-400">
+                  Memuat katalog menu...
                 </div>
-              </div>
+              )}
 
-              <div className="text-[10px] font-bold text-slate-400">
-                STORE STOCK
-              </div>
-            </div>
-
-            <div className="border-b border-slate-200 bg-white px-4 py-3">
-              <CategoryTabs
-                categories={categoryTabs}
-                activeCategoryId={activeCategory}
-                onSelectCategory={setActiveCategory}
-              />
-            </div>
-
-            {menuItemsQuery.isLoading && (
-              <div className="p-4 text-sm font-semibold text-slate-400">
-                Loading menu...
-              </div>
-            )}
-
-            {menuItemsQuery.isError && (
-              <div className="p-4 text-sm font-semibold text-red-600">
-                Failed to load menu: {(menuItemsQuery.error as Error).message}
-              </div>
-            )}
-
-            {menuItemsQuery.isSuccess && filteredProducts.length === 0 && (
-              <div className="p-8 text-center text-sm font-semibold text-slate-400">
-                No products found matching your search or filter.
-              </div>
-            )}
-
-            {menuItemsQuery.isSuccess && filteredProducts.length > 0 && (
-              <ProductGrid
-                products={filteredProducts}
-                onAddProduct={addProduct}
-              />
-            )}
-          </section>
-
-          <aside className="flex min-h-0 flex-col bg-white">
-            {successMessage && (
-              <div className="flex items-center justify-between border-b border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-semibold text-emerald-800">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-[9px] font-bold text-white">
-                    ✓
-                  </span>
-                  <span>{successMessage}</span>
+              {menuItemsQuery.isError && (
+                <div className="m-4 rounded-lg border border-red-200 bg-red-50 p-3.5 text-xs font-semibold text-red-600">
+                  Gagal memuat menu: {(menuItemsQuery.error as Error).message}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setSuccessMessage(null)}
-                  className="ml-2 font-bold text-emerald-700 hover:text-emerald-950"
-                >
-                  ×
-                </button>
-              </div>
-            )}
+              )}
 
-            <div className="flex h-14 items-center justify-between border-b border-slate-200 px-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-extrabold uppercase tracking-tight">
-                    Current Order
-                  </span>
-                  {activeOrderId && (
-                    <span className="rounded bg-emerald-100 px-1.5 py-0.2 text-[9px] font-extrabold text-emerald-800">
-                      RECALLED
-                    </span>
-                  )}
+              {menuItemsQuery.isSuccess && filteredProducts.length === 0 && (
+                <div className="p-12 text-center text-xs font-semibold text-slate-400">
+                  Tidak ada produk yang cocok dengan pencarian atau filter kategori.
                 </div>
+              )}
 
-                <div className="mt-0.5 flex items-center gap-2 text-[10px] font-semibold text-slate-400">
-                  <span>{lastOrderNumber ? `Order: ${lastOrderNumber}` : "New Order"}</span>
-                  <button
-                    type="button"
-                    onClick={() => setSavedOrdersModalOpen(true)}
-                    className="text-blue-600 hover:text-blue-800 font-bold underline cursor-pointer"
-                  >
-                    Saved ({openOrdersCount})
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex rounded-md border border-slate-200 bg-slate-100 p-0.5">
-                <button
-                  type="button"
-                  onClick={() => setOrderType("DINE_IN")}
-                  className={`rounded px-2.5 py-1 text-[10px] font-bold transition-all ${
-                    orderType === "DINE_IN"
-                      ? "bg-blue-600 text-white shadow-sm"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  DINE IN
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOrderType("TAKEAWAY")
-                    setSelectedTable(null)
+              {menuItemsQuery.isSuccess && filteredProducts.length > 0 && (
+                <ProductGrid
+                  products={filteredProducts}
+                  onAddProduct={(p) => {
+                    cart.addProduct(p)
+                    setSuccessMessage(null)
                   }}
-                  className={`rounded px-2.5 py-1 text-[10px] font-bold transition-all ${
-                    orderType === "TAKEAWAY"
-                      ? "bg-blue-600 text-white shadow-sm"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  TAKEAWAY
-                </button>
-              </div>
-            </div>
+                />
+              )}
+            </section>
 
-            {orderType === "DINE_IN" && (
-              <div className="flex items-center justify-between border-b border-slate-200 bg-blue-50/50 px-4 py-2">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-                  <Table2 size={15} className="text-blue-600" />
-                  <span>Meja:</span>
-                  <span
-                    className={
-                      selectedTable
-                        ? "text-blue-700 font-extrabold"
-                        : "text-slate-400 font-normal italic"
-                    }
-                  >
-                    {selectedTable ? selectedTable.table_number : "Belum dipilih"}
-                  </span>
-                  {selectedTable && (
-                    <span className="text-[10px] text-slate-500 font-medium">
-                      ({selectedTable.capacity} Kursi)
-                    </span>
-                  )}
-                </div>
-                <Button
-                  size="compact-xs"
-                  variant="light"
-                  color="blue"
-                  onClick={() => setTableModalOpen(true)}
-                  styles={{ root: { fontSize: 11 } }}
-                >
-                  {selectedTable ? "Ganti" : "Pilih Meja"}
-                </Button>
-              </div>
-            )}
+            {/* Desktop Cart Aside (Always visible on lg screen) */}
+            <aside className="hidden lg:flex w-95 shrink-0 min-h-0 flex-col bg-white">
+              {renderCartContent()}
+            </aside>
 
-            <OrderPanel
-              items={orderItems}
-              onIncrease={increaseItem}
-              onDecrease={decreaseItem}
-              onRemove={removeItem}
+            {/* Mobile Bottom Floating Cart Bar */}
+            <CartFloatingBar
+              itemCount={cart.itemCount}
+              total={cart.total}
+              onOpenCart={() => cart.setCartDrawerOpen(true)}
             />
 
-            <OrderSummary
-              subtotal={subtotal}
-              tax={tax}
-              total={total}
-            />
-
-            {createOrderMutation.isError && (
-              <div className="border-t border-red-200 bg-red-50 p-2 text-xs font-semibold text-red-600">
-                Failed to save order:{" "}
-                {(createOrderMutation.error as Error).message}
-              </div>
-            )}
-
-            <OrderActions
-              total={total}
-              disabled={orderItems.length === 0 || createOrderMutation.isPending || isProcessingPayment}
-              isSaving={createOrderMutation.isPending}
-              onSaveOrder={handleSaveOrder}
-              onPayOrder={() => setPaymentModalOpen(true)}
-              onClearOrder={() => {
-                setOrderItems([])
-                setActiveOrderId(null)
-                setSelectedTable(null)
-                setLastOrderNumber(null)
-                setSuccessMessage(null)
-              }}
-            />
-          </aside>
-        </main>
+            {/* Mobile / Tablet Cart Drawer */}
+            <CartDrawer
+              opened={cart.cartDrawerOpen}
+              onClose={() => cart.setCartDrawerOpen(false)}
+            >
+              {renderCartContent()}
+            </CartDrawer>
+          </main>
         )}
 
         {currentView === "DASHBOARD" && (
@@ -589,11 +580,25 @@ function App() {
         {currentView === "TABLES" && (
           <TablesView
             tables={tables}
-            selectedTableId={selectedTable?.id ?? null}
+            openOrders={openOrders}
+            selectedTableId={cart.selectedTable?.id ?? null}
             onSelectTableForOrder={(table) => {
-              setSelectedTable(table)
-              setOrderType("DINE_IN")
+              cart.setSelectedTable(table)
+              cart.setOrderType("DINE_IN")
               setCurrentView("ORDERS")
+            }}
+            onSelectOrder={handleLoadOrderFromDashboard}
+            onReleaseTable={async (tableId) => {
+              try {
+                await updateTableStatus(tableId, {
+                  company_id: DEV_COMPANY_ID,
+                  store_id: DEV_STORE_ID,
+                  status: "AVAILABLE",
+                })
+                queryClient.invalidateQueries({ queryKey: ["tables"] })
+              } catch (err) {
+                alert(`Gagal merilis status meja: ${(err as Error).message}`)
+              }
             }}
           />
         )}
@@ -635,6 +640,7 @@ function App() {
         )}
       </div>
 
+      {/* Global Modals */}
       <SavedOrdersModal
         opened={savedOrdersModalOpen}
         onClose={() => setSavedOrdersModalOpen(false)}
@@ -645,20 +651,25 @@ function App() {
         opened={tableModalOpen}
         onClose={() => setTableModalOpen(false)}
         tables={tables}
-        selectedTableId={selectedTable?.id ?? null}
+        openOrders={openOrders}
+        selectedTableId={cart.selectedTable?.id ?? null}
         onSelectTable={(tbl) => {
-          setSelectedTable(tbl)
-          setOrderType("DINE_IN")
+          cart.setSelectedTable(tbl)
+          cart.setOrderType("DINE_IN")
         }}
-        onClearTable={() => setSelectedTable(null)}
+        onSelectOrder={(order) => {
+          handleLoadOrderFromDashboard(order)
+          setTableModalOpen(false)
+        }}
+        onClearTable={() => cart.setSelectedTable(null)}
       />
 
       <PaymentModal
         opened={paymentModalOpen}
         onClose={() => setPaymentModalOpen(false)}
-        totalAmount={total}
-        orderNumber={lastOrderNumber ?? undefined}
-        itemsCount={orderItems.length}
+        totalAmount={cart.total}
+        orderNumber={cart.lastOrderNumber ?? undefined}
+        itemsCount={cart.orderItems.length}
         onConfirmPayment={handleConfirmPayment}
         isProcessing={isProcessingPayment}
       />
@@ -686,4 +697,3 @@ function App() {
 }
 
 export default App
-
