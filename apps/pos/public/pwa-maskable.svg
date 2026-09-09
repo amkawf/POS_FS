@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="posBlueGradMask" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1E40AF" />
+      <stop offset="50%" stop-color="#2563EB" />
+      <stop offset="100%" stop-color="#38BDF8" />
+    </linearGradient>
+    <linearGradient id="bgGradMask" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F172A" />
+      <stop offset="100%" stop-color="#1E293B" />
+    </linearGradient>
+  </defs>
+
+  <!-- Full Bleed Background for Safe Zone Cropping -->
+  <rect width="512" height="512" fill="url(#bgGradMask)" />
+
+  <!-- Scaled down to 72% to guarantee 100% safety within W3C 410px circle -->
+  <g transform="translate(85, 85) scale(0.668)">
+    <path d="M290 110c20-15 45-20 70-12 35 11 58 44 58 82" 
+          fill="none" stroke="#38BDF8" stroke-width="20" stroke-linecap="round" />
+    <path d="M315 150c12-8 26-10 40-5 18 6 30 24 30 45" 
+          fill="none" stroke="#38BDF8" stroke-width="20" stroke-linecap="round" />
+
+    <g transform="matrix(0.866 0.5 -0.5 0.866 220 -30)">
+      <rect x="100" y="120" width="150" height="230" rx="24" fill="#1E40AF" stroke="#38BDF8" stroke-width="12" />
+      <rect x="118" y="140" width="114" height="75" rx="10" fill="#0F172A" />
+      <rect x="130" y="80" width="90" height="40" rx="6" fill="#F8FAFC" />
+      <circle cx="138" cy="245" r="8" fill="#93C5FD" />
+      <circle cx="175" cy="245" r="8" fill="#93C5FD" />
+      <circle cx="212" cy="245" r="8" fill="#93C5FD" />
+      <circle cx="138" cy="275" r="8" fill="#93C5FD" />
+      <circle cx="175" cy="275" r="8" fill="#93C5FD" />
+      <circle cx="212" cy="275" r="8" fill="#93C5FD" />
+      <rect x="130" y="305" width="90" height="18" rx="6" fill="#2563EB" />
+    </g>
+
+    <path d="M70 400 L200 300 L280 340 L440 130" 
+          fill="none" stroke="url(#posBlueGradMask)" stroke-width="34" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M370 130 H440 V200" 
+          fill="none" stroke="url(#posBlueGradMask)" stroke-width="34" stroke-linecap="round" stroke-linejoin="round" />
+  </g>
+</svg>

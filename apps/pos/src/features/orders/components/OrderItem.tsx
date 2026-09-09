@@ -55,7 +55,7 @@ export function OrderItem({
         <button
         type="button"
         onClick={() => setIsEditingNote(true)}
-        className="mt-1 text-[10px] font-medium text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
+        className="mt-1 text-[5px] font-small text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
         >
           + Tambah Catatan
         </button>

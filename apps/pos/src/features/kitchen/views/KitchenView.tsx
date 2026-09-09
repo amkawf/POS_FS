@@ -87,6 +87,21 @@ export function KitchenView({ tables = [] }: KitchenViewProps) {
     })
   }
 
+
+  const statusPriority: Record<string, number> = {
+    PENDING: 1,
+    PREPARING: 2,
+    READY: 3,
+    SERVED: 4,
+    CANCELLED: 5,
+  }
+
+  const sortedTickets = [...tickets].sort((a, b) => {
+    const prioA = statusPriority[a.status] ?? 99
+    const prioB = statusPriority[b.status] ?? 99
+    if (prioA != prioB) return prioA - prioB
+    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  })
   const pendingCount = tickets.filter((t) => t.status === "PENDING").length
   const preparingCount = tickets.filter((t) => t.status === "PREPARING").length
   const readyCount = tickets.filter((t) => t.status === "READY").length
@@ -236,7 +251,7 @@ export function KitchenView({ tables = [] }: KitchenViewProps) {
 
       {!isLoading && !isError && tickets.length > 0 && (
         <div className="mt-6 grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {tickets.map((ticket) => {
+          {sortedTickets.map((ticket) => {
             const isProcessing = updateMutation.isPending && updateMutation.variables?.ticketId === ticket.id
             const tableDisplay =
               ticket.table_number ??

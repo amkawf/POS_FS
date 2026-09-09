@@ -50,8 +50,26 @@ import { DEV_COMPANY_ID, DEV_STORE_ID } from "./config"
 import type { PosView } from "./types/navigation"
 import type { OrderItem } from "./types/pos"
 
+import { useLocation, useNavigate } from "react-router-dom"
+import { ALL_NAV_ITEMS } from "./config/navigation"
+
 export function App() {
-  const [currentView, setCurrentView] = useState<PosView>("ORDERS")
+  // const [currentView, setCurrentView] = useState<PosView>("ORDERS")
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  // deteksi view dari url saat ini
+  const currenNavItem = ALL_NAV_ITEMS.find((item) => item.path === location.pathname)
+  const currentView: PosView = currenNavItem ? currenNavItem.view : "ORDERS"
+
+  // fungsi perpindahan halaman url
+  const handleViewChange = (view: PosView) => {
+    const target = ALL_NAV_ITEMS.find((item) => item.view === view)
+    if (target) {
+      navigate(target.path)
+    }
+  }
+
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [activeCategory, setActiveCategory] = useState("ALL")
@@ -180,9 +198,10 @@ export function App() {
         name: item.item_name,
         price: item.unit_price,
         qty: item.quantity,
+        notes: item.notes,
       }))
       handleSelectSavedOrder(fullOrder, items)
-      setCurrentView("ORDERS")
+      handleViewChange("ORDERS")
     } catch (err) {
       alert(`Gagal memuat pesanan: ${(err as Error).message}`)
     }
@@ -480,7 +499,7 @@ export function App() {
         {/* Desktop Persistent Sidebar */}
         <Sidebar
           activeView={currentView}
-          onViewChange={setCurrentView}
+          onViewChange={handleViewChange}
         />
 
         {/* Mobile Navigation Drawer */}
@@ -488,7 +507,7 @@ export function App() {
           opened={mobileNavOpen}
           onClose={() => setMobileNavOpen(false)}
           activeView={currentView}
-          onViewChange={setCurrentView}
+          onViewChange={handleViewChange}
         />
 
         {/* View Content Area */}
@@ -576,7 +595,7 @@ export function App() {
             completedOrders={completedOrders}
             tables={tables}
             menuItemsCount={products.length}
-            onNavigateToOrders={() => setCurrentView("ORDERS")}
+            onNavigateToOrders={() => handleViewChange("ORDERS")}
             onSelectOrder={handleLoadOrderFromDashboard}
           />
         )}
@@ -589,7 +608,7 @@ export function App() {
             onSelectTableForOrder={(table) => {
               cart.setSelectedTable(table)
               cart.setOrderType("DINE_IN")
-              setCurrentView("ORDERS")
+              handleViewChange("ORDERS")
             }}
             onSelectOrder={handleLoadOrderFromDashboard}
             onReleaseTable={async (tableId) => {
