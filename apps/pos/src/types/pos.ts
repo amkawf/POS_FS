@@ -20,6 +20,7 @@ export type Product = {
   name: string
   price: number
   categoryIds?: string[]
+  stock?: number
 }
 
 export type OrderItem = {

@@ -95,9 +95,15 @@ export function InventoryView({ products, categories }: InventoryViewProps) {
                     {formatRupiah(p.price)}
                   </td>
                   <td className="px-5 py-3.5 text-right">
-                    <Badge size="xs" color="green" variant="dot">
-                      Tersedia
-                    </Badge>
+                    {p.stock !== undefined && p.stock <= 0 ? (
+                      <Badge size="xs" color="red" variant="light">
+                        Habis (0)
+                      </Badge>
+                    ) : (
+                      <Badge size="xs" color="green" variant="light">
+                        {p.stock !== undefined ? `${p.stock} Porsi` : "Tersedia"}
+                      </Badge>
+                    )}
                   </td>
                 </tr>
               ))}

@@ -99,8 +99,8 @@ export function App() {
 
   // Queries
   const menuItemsQuery = useQuery({
-    queryKey: ["menu-items", DEV_COMPANY_ID],
-    queryFn: () => fetchMenuItems(DEV_COMPANY_ID),
+    queryKey: ["menu-items", DEV_COMPANY_ID,DEV_STORE_ID],
+    queryFn: () => fetchMenuItems(DEV_COMPANY_ID, DEV_STORE_ID),
   })
 
   const menuCategoriesQuery = useQuery({
@@ -300,6 +300,7 @@ export function App() {
       // 4. Invalidate & reset
       queryClient.invalidateQueries({ queryKey: ["orders"] })
       queryClient.invalidateQueries({ queryKey: ["tables"] })
+      queryClient.invalidateQueries({ queryKey: ["menu-items"] })
       setPaymentModalOpen(false)
       cart.setCartDrawerOpen(false)
       setReceiptModalOpen(true)

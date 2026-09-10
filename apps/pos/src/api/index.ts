@@ -24,26 +24,27 @@ type MenuItemResponse = {
   description?: string
   base_price: number
   category_ids?: string[]
+  stock?: number
 }
 
-export async function fetchMenuItems(companyId: string): Promise<Product[]> {
+export async function fetchMenuItems(companyId: string, storeId?: string): Promise<Product[]> { // Terima storeId
   const url = new URL(`${API_BASE_URL}/menu-items`)
   url.searchParams.set("company_id", companyId)
-
+  if (storeId) {
+    url.searchParams.set("store_id", storeId) // Kirim store_id jika ada
+  }
   const response = await fetch(url)
-
   if (!response.ok) {
     await parseErrorResponse(response)
   }
-
   const data: { items: MenuItemResponse[] } = await response.json()
-
   return data.items.map((item) => ({
     id: item.id,
     sku: item.sku,
     name: item.name,
     price: item.base_price,
     categoryIds: item.category_ids ?? [],
+    stock: item.stock, //  Teruskan ke Product
   }))
 }
 
