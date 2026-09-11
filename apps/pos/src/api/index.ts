@@ -336,3 +336,24 @@ export async function updateKitchenTicketStatus(
 }
 
 
+export type AdjustStockPayload = {
+  company_id: string
+  store_id: string
+  menu_item_id: string
+  quantity: number
+  notes?: string
+}
+
+export async function adjustStock(payload: AdjustStockPayload): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/inventory/adjust`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    await parseErrorResponse(response)
+  }
+}

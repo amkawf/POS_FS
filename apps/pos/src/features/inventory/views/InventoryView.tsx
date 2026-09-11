@@ -1,8 +1,11 @@
 import { useState } from "react"
-import { Badge, TextInput } from "@mantine/core"
-import { Package, Search } from "lucide-react"
+import { Badge, Button, Modal, NumberInput, TextInput } from "@mantine/core"
+import { Package, Plus, Search } from "lucide-react"
+import { useQueryClient } from "@tanstack/react-query"
 import type { Category, Product } from "../../../types/pos"
 import { formatRupiah } from "../../../utils/currency"
+import { adjustStock } from "../../../api"
+import { DEV_COMPANY_ID, DEV_STORE_ID } from "../../../config"
 
 type InventoryViewProps = {
   products: Product[]
@@ -10,7 +13,14 @@ type InventoryViewProps = {
 }
 
 export function InventoryView({ products, categories }: InventoryViewProps) {
+  const queryClient = useQueryClient()
   const [search, setSearch] = useState("")
+
+  // State untuk Modal Tambah Stok
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+  const [adjustQty, setAdjustQty] = useState<number>(20)
+  const [notes, setNotes] = useState("Restock harian")
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const getCategoryName = (catIds?: string[]) => {
     if (!catIds || catIds.length === 0) return "Tanpa Kategori"
@@ -26,6 +36,34 @@ export function InventoryView({ products, categories }: InventoryViewProps) {
       p.sku.toLowerCase().includes(q)
     )
   })
+
+  // Handler Submit Tambah Stok
+  const handleAdjustStock = async () => {
+    if (!selectedProduct || adjustQty <= 0) return
+
+    setIsSubmitting(true)
+    try {
+      await adjustStock({
+        company_id: DEV_COMPANY_ID,
+        store_id: DEV_STORE_ID,
+        menu_item_id: selectedProduct.id,
+        quantity: adjustQty,
+        notes: notes.trim() || `Restock manual (+${adjustQty})`,
+      })
+
+      // Invalidate cache agar tabel dan kartu menu otomatis reload stok terbaru
+      await queryClient.invalidateQueries({ queryKey: ["menu-items"] })
+
+      // Tutup modal & reset form
+      setSelectedProduct(null)
+      setAdjustQty(20)
+      setNotes("Restock harian")
+    } catch (err) {
+      alert(`Gagal menambah stok: ${(err as Error).message}`)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   return (
     <div className="flex-1 overflow-y-auto bg-slate-50 p-4 sm:p-6">
@@ -75,6 +113,7 @@ export function InventoryView({ products, categories }: InventoryViewProps) {
                 <th className="px-5 py-3">Kategori</th>
                 <th className="px-5 py-3 text-right">Harga Dasar</th>
                 <th className="px-5 py-3 text-right">Status Stok</th>
+                <th className="px-5 py-3 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -105,13 +144,80 @@ export function InventoryView({ products, categories }: InventoryViewProps) {
                       </Badge>
                     )}
                   </td>
+                  <td className="px-5 py-3.5 text-right">
+                    <Button
+                      size="xs"
+                      variant="light"
+                      color="blue"
+                      leftSection={<Plus size={12} />}
+                      onClick={() => {
+                        setSelectedProduct(p)
+                        setAdjustQty(20)
+                        setNotes("Restock harian")
+                      }}
+                    >
+                      + Stok
+                    </Button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* MODAL TAMBAH STOK */}
+      <Modal
+        opened={selectedProduct !== null}
+        onClose={() => setSelectedProduct(null)}
+        title={
+          <span className="text-sm font-bold text-slate-900">
+            Tambah Stok: {selectedProduct?.name}
+          </span>
+        }
+        centered
+      >
+        <div className="flex flex-col gap-4">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+            <div>SKU: <span className="font-mono font-bold text-slate-800">{selectedProduct?.sku}</span></div>
+            <div className="mt-1">
+              Stok Saat Ini:{" "}
+              <span className="font-bold text-blue-600">
+                {selectedProduct?.stock ?? 0} Porsi
+              </span>
+            </div>
+          </div>
+
+          <NumberInput
+            label="Jumlah Tambahan Porsi"
+            description="Masukkan jumlah porsi yang baru datang"
+            value={adjustQty}
+            onChange={(val) => setAdjustQty(typeof val === "number" ? val : 0)}
+            min={1}
+            step={1}
+          />
+
+          <TextInput
+            label="Catatan Mutasi"
+            placeholder="Contoh: Kiriman dari suplier"
+            value={notes}
+            onChange={(e) => setNotes(e.currentTarget.value)}
+          />
+
+          <div className="mt-2 flex justify-end gap-2">
+            <Button variant="default" onClick={() => setSelectedProduct(null)}>
+              Batal
+            </Button>
+            <Button
+              color="blue"
+              loading={isSubmitting}
+              onClick={handleAdjustStock}
+            >
+              Simpan Stok
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }
-
