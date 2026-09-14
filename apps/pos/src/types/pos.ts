@@ -21,6 +21,7 @@ export type Product = {
   price: number
   categoryIds?: string[]
   stock?: number
+  fulfillment_type?: "BATCH_COOKING" | "MADE_TO_ORDER"
 }
 
 export type OrderItem = {
@@ -30,4 +31,23 @@ export type OrderItem = {
   price: number
   qty: number
   notes?: string
+}
+
+export type Ingredient = {
+  id: string
+  company_id: string
+  code?: string
+  name: string
+  unit: string
+  min_stock_alert: number
+  stock?: number
+}
+
+export type RecipeItem = {
+  id?: string
+  menu_item_id: string
+  ingredient_id: string
+  ingredient_name?: string
+  ingredient_unit?: string
+  quantity_per_portion: number
 }

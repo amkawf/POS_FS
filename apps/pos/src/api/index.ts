@@ -25,6 +25,7 @@ type MenuItemResponse = {
   base_price: number
   category_ids?: string[]
   stock?: number
+  fulfillment_type?: "BATCH_COOKING" | "MADE_TO_ORDER" 
 }
 
 export async function fetchMenuItems(companyId: string, storeId?: string): Promise<Product[]> { // Terima storeId
@@ -45,6 +46,7 @@ export async function fetchMenuItems(companyId: string, storeId?: string): Promi
     price: item.base_price,
     categoryIds: item.category_ids ?? [],
     stock: item.stock, //  Teruskan ke Product
+    fulfillment_type: item.fulfillment_type,
   }))
 }
 
@@ -350,6 +352,208 @@ export async function adjustStock(payload: AdjustStockPayload): Promise<void> {
     headers: {
       "Content-Type": "application/json",
     },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    await parseErrorResponse(response)
+  }
+}
+
+// ==========================================
+// 1. API BAHAN BAKU (INGREDIENTS)
+// ==========================================
+
+export type Ingredient = {
+  id: string
+  company_id: string
+  code?: string
+  name: string
+  unit: string
+  min_stock_alert: number
+  stock?: number
+}
+
+// Mengambil daftar bahan baku beserta stok toko saat ini
+export async function fetchIngredients(companyId: string, storeId: string): Promise<Ingredient[]> {
+  const url = new URL(`${API_BASE_URL}/ingredients`)
+  url.searchParams.set("company_id", companyId)
+  url.searchParams.set("store_id", storeId)
+
+  const response = await fetch(url)
+  if (!response.ok) {
+    await parseErrorResponse(response)
+  }
+
+  const data: { ingredients: Ingredient[] } = await response.json()
+  return data.ingredients
+}
+
+// Pendaftaran master bahan baku baru
+export type CreateIngredientPayload = {
+  company_id: string
+  code?: string
+  name: string
+  unit: string
+  min_stock_alert?: number
+}
+
+export async function createIngredient(payload: CreateIngredientPayload): Promise<Ingredient> {
+  const response = await fetch(`${API_BASE_URL}/ingredients`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    await parseErrorResponse(response)
+  }
+
+  return response.json()
+}
+
+// Pencatatan belanja bahan baku masuk (Restock)
+export type RestockIngredientPayload = {
+  company_id: string
+  store_id: string
+  ingredient_id: string
+  quantity: number
+  notes?: string
+}
+
+export async function restockIngredient(payload: RestockIngredientPayload): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/ingredients/restock`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    await parseErrorResponse(response)
+  }
+}
+
+// ==========================================
+// 2. API RESEP (RECIPE / BOM)
+// ==========================================
+
+export type RecipeItem = {
+  id?: string
+  menu_item_id: string
+  ingredient_id: string
+  ingredient_name?: string
+  ingredient_unit?: string
+  quantity_per_portion: number
+}
+
+// Mengambil takaran resep untuk 1 menu
+export async function fetchRecipeByMenuItem(menuItemId: string): Promise<RecipeItem[]> {
+  const response = await fetch(`${API_BASE_URL}/recipes/${menuItemId}`)
+  if (!response.ok) {
+    await parseErrorResponse(response)
+  }
+
+  const data: { items: RecipeItem[] } = await response.json()
+  return data.items ?? []
+}
+
+// Menyimpan komposisi resep baru untuk 1 menu
+export async function saveRecipe(
+  menuItemId: string,
+  items: { ingredient_id: string; quantity_per_portion: number }[],
+): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/recipes/${menuItemId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ items }),
+  })
+
+  if (!response.ok) {
+    await parseErrorResponse(response)
+  }
+}
+
+// ==========================================
+// 3. API BUAT MENU BARU (CREATE MENU ITEM)
+// ==========================================
+
+export type CreateMenuItemPayload = {
+  company_id: string
+  sku: string
+  name: string
+  description?: string
+  base_price: number
+  category_ids?: string[]
+  fulfillment_type?: "BATCH_COOKING" | "MADE_TO_ORDER"
+}
+
+export async function createMenuItem(payload: CreateMenuItemPayload): Promise<Product> {
+  const response = await fetch(`${API_BASE_URL}/menu-items`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    await parseErrorResponse(response)
+  }
+
+  const item = await response.json()
+  return {
+    id: item.id,
+    sku: item.sku,
+    name: item.name,
+    price: item.base_price,
+    categoryIds: item.category_ids ?? [],
+    stock: item.stock,
+  }
+}
+
+// ==========================================
+// 4. API PRODUKSI DAPUR (BATCH COOKING)
+// ==========================================
+
+export type BatchProducePayload = {
+  company_id: string
+  store_id: string
+  menu_item_id: string
+  portions: number
+  notes?: string
+}
+
+export async function batchProduce(payload: BatchProducePayload): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/kitchen/produce`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    await parseErrorResponse(response)
+  }
+}
+
+// ==========================================
+// TIPE & FUNGSI UPDATE BAHAN BAKU
+// ==========================================
+
+// Payload untuk memperbarui atribut master bahan baku
+export type UpdateIngredientPayload = {
+  company_id: string
+  code?: string
+  name: string
+  unit: string
+  min_stock_alert?: number
+}
+
+// Memanggil endpoint PUT /api/v1/ingredients/:id
+export async function updateIngredient(
+  id: string,
+  payload: UpdateIngredientPayload,
+): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/ingredients/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   })
 
