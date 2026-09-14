@@ -1,15 +1,19 @@
 import {
   Bell,
   ChevronDown,
+  Lock,
+  LogOut,
   Menu,
   Monitor,
+  ReceiptText,
   Search,
   ShoppingBag,
   ShoppingCart,
   Store,
 } from "lucide-react"
-import { TextInput } from "@mantine/core"
+import { Menu as MantineMenu, TextInput } from "@mantine/core"
 import type { PosView } from "../../types/navigation"
+import { useAuth } from "../../context/AuthContext"
 
 type TopBarProps = {
   searchQuery?: string
@@ -20,6 +24,7 @@ type TopBarProps = {
   cartItemCount?: number
   onOpenMobileCart?: () => void
   currentView?: PosView
+  onOpenCloseShift?: () => void 
 }
 
 export function TopBar({
@@ -31,7 +36,9 @@ export function TopBar({
   cartItemCount = 0,
   onOpenMobileCart,
   currentView = "ORDERS",
+  onOpenCloseShift,
 }: TopBarProps) {
+  const { currentUser, activeShift, quickLock, logout } = useAuth()
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-3 sm:px-4">
       {/* LEFT: HAMBURGER (MOBILE) + BRAND */}
@@ -154,19 +161,65 @@ export function TopBar({
           <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-blue-600 ring-2 ring-white" />
         </button>
 
-        {/* User Profile Avatar */}
-        <div className="flex items-center gap-2">
-          <div className="flex h-8.5 w-8.5 items-center justify-center rounded-full border border-blue-200/80 bg-blue-50 text-xs font-bold text-blue-600">
-            AM
-          </div>
-
-          <div className="hidden xl:block">
-            <div className="text-xs font-bold text-slate-900">Cashier</div>
-            <div className="text-[9px] font-medium text-slate-400">USER-001</div>
-          </div>
-
-          <ChevronDown size={14} strokeWidth={2} className="hidden xl:block text-slate-400" />
-        </div>
+        {/* Tombol Cepat Kunci Layar */}
+        <button
+          type="button"
+          onClick={quickLock}
+          className="flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 transition-all hover:bg-slate-50 hover:text-slate-900 active:scale-95 cursor-pointer shadow-2xs"
+          title="Kunci Layar (Quick Lock)"
+        >
+          <Lock size={15} strokeWidth={2} className="text-slate-600" />
+          <span className="hidden md:inline">Kunci</span>
+        </button>
+        {/* User Profile Dropdown Menu */}
+        <MantineMenu shadow="md" width={200} position="bottom-end">
+          <MantineMenu.Target>
+            <button
+              type="button"
+              className="flex items-center gap-2 rounded-lg p-1 transition-colors hover:bg-slate-100 cursor-pointer"
+            >
+              <div className="flex h-8.5 w-8.5 items-center justify-center rounded-full border border-blue-200/80 bg-blue-50 text-xs font-bold text-blue-600 uppercase">
+                {currentUser?.name ? currentUser.name.slice(0, 2) : "ST"}
+              </div>
+              <div className="hidden xl:block text-left">
+                <div className="text-xs font-bold text-slate-900">
+                  {currentUser?.name || "Staf"}
+                </div>
+                <div className="text-[9px] font-bold uppercase tracking-wider text-blue-600">
+                  {currentUser?.role || "GUEST"}
+                </div>
+              </div>
+              <ChevronDown size={14} strokeWidth={2} className="hidden xl:block text-slate-400" />
+            </button>
+          </MantineMenu.Target>
+                    <MantineMenu.Dropdown>
+            <MantineMenu.Label>Sesi Staf Aktif</MantineMenu.Label>
+            <MantineMenu.Item
+              leftSection={<Lock size={14} />}
+              onClick={quickLock}
+            >
+              Kunci Layar
+            </MantineMenu.Item>
+            {/* 💵 Opsi Tutup Kasir Khusus Kasir yang sedang punya Shift Aktif */}
+            {currentUser?.role === "CASHIER" && activeShift && (
+              <MantineMenu.Item
+                color="orange"
+                leftSection={<ReceiptText size={14} />}
+                onClick={onOpenCloseShift}
+              >
+                Tutup Kasir (End Shift)
+              </MantineMenu.Item>
+            )}
+            <MantineMenu.Divider />
+            <MantineMenu.Item
+              color="red"
+              leftSection={<LogOut size={14} />}
+              onClick={logout}
+            >
+              Keluar (Logout)
+            </MantineMenu.Item>
+          </MantineMenu.Dropdown>
+        </MantineMenu>
       </div>
     </header>
   )

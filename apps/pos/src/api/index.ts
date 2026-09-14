@@ -1,5 +1,6 @@
 import { API_BASE_URL } from "../config"
-import type { Category, Product, Table } from "../types/pos"
+// Ganti baris 2 menjadi ini (tanpa Ingredient dan RecipeItem):
+import type { Category, Product, Table, Role, User, CashierShift } from "../types/pos"
 
 export class ApiError extends Error {
   code: string
@@ -553,6 +554,94 @@ export async function updateIngredient(
 ): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/ingredients/${id}`, {
     method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    await parseErrorResponse(response)
+  }
+}
+
+// ==========================================
+// 5. API AUTENTIKASI STAF & POS SHIFT
+// ==========================================
+
+export type PinLoginPayload = {
+  store_id: string
+  pin: string
+}
+
+export type PinLoginResponse = {
+  user: User
+  token: string
+  active_shift?: CashierShift
+}
+
+// 1. Verifikasi PIN kasir/koki
+export async function pinLogin(payload: PinLoginPayload): Promise<PinLoginResponse> {
+  const response = await fetch(`${API_BASE_URL}/auth/pin-login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    await parseErrorResponse(response)
+  }
+
+  return response.json()
+}
+
+export type StaffProfile = {
+  id: string
+  name: string
+  role: Role
+}
+
+// 2. Mengambil daftar nama staf di toko (untuk tampilan avatar layar kunci)
+export async function fetchStoreStaff(storeId: string): Promise<StaffProfile[]> {
+  const response = await fetch(`${API_BASE_URL}/auth/staff?store_id=${storeId}`)
+  if (!response.ok) {
+    await parseErrorResponse(response)
+  }
+  const data: { staff: StaffProfile[] } = await response.json()
+  return data.staff ?? []
+}
+
+export type OpenShiftPayload = {
+  company_id: string
+  store_id: string
+  user_id: string
+  starting_cash: number
+}
+
+// 3. Membuka laci kasir (Modal Awal)
+export async function openCashierShift(payload: OpenShiftPayload): Promise<CashierShift> {
+  const response = await fetch(`${API_BASE_URL}/auth/shifts/open`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    await parseErrorResponse(response)
+  }
+
+  return response.json()
+}
+
+export type CloseShiftPayload = {
+  shift_id: string
+  actual_ending_cash: number
+  expected_ending_cash: number
+  notes?: string
+}
+
+// 4. Menutup laci kasir & rekonsiliasi kas
+export async function closeCashierShift(payload: CloseShiftPayload): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/auth/shifts/close`, {
+    method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   })

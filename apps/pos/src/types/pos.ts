@@ -51,3 +51,29 @@ export type RecipeItem = {
   ingredient_unit?: string
   quantity_per_portion: number
 }
+
+// ==========================================
+// TIPE AUTENTIKASI & SESI KASIR (SHIFTS)
+// ==========================================
+
+export type Role = "OWNER" | "MANAGER" | "CASHIER" | "KITCHEN"
+
+export type User = {
+  id: string
+  company_id: string
+  name: string
+  email?: string
+  role: Role
+  status: string
+}
+
+export type CashierShift = {
+  id: string
+  company_id: string
+  store_id: string
+  user_id: string
+  user_name?: string
+  opened_at: string
+  starting_cash: number
+  status: "OPEN" | "CLOSED"
+}

@@ -53,7 +53,18 @@ import type { OrderItem } from "./types/pos"
 import { useLocation, useNavigate } from "react-router-dom"
 import { ALL_NAV_ITEMS } from "./config/navigation"
 
+import { useAuth } from "./context/AuthContext"
+import { LockScreenView } from "./features/auth/views/LockScreenView"
+import { CloseShiftModal } from "./features/auth/components/CloseShiftModal" 
+
 export function App() {
+  const { isLocked, activeShift, closeShift, quickLock } = useAuth()
+
+  // GATEKEEPER: Tahan render jika kasir/terminal sedang terkunci
+  if (isLocked) {
+    return <LockScreenView />
+  }
+
   // const [currentView, setCurrentView] = useState<PosView>("ORDERS")
   const location = useLocation()
   const navigate = useNavigate()
@@ -74,6 +85,8 @@ export function App() {
   const [searchQuery, setSearchQuery] = useState("")
   const [activeCategory, setActiveCategory] = useState("ALL")
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [closeShiftModalOpen, setCloseShiftModalOpen] = useState(false)
+  const [isClosingShift, setIsClosingShift] = useState(false)
 
   // Modals state
   const [savedOrdersModalOpen, setSavedOrdersModalOpen] = useState(false)
@@ -130,6 +143,33 @@ export function App() {
   const completedOrders = completedOrdersQuery.data ?? []
   const allOrders = [...openOrders, ...completedOrders]
   const products = menuItemsQuery.data ?? []
+
+    // 💵 Hitung total uang tunai yang masuk ke laci selama shift ini
+  const currentShiftCashSales = completedOrders
+    .filter((order) => {
+      const isCash = (order.notes || "").includes("Payment: CASH")
+      if (!activeShift?.opened_at) return isCash
+      return isCash && new Date(order.opened_at) >= new Date(activeShift.opened_at)
+    })
+    .reduce((sum, ord) => sum + ord.total_amount, 0)
+
+  // Handler konfirmasi tutup shift
+  const handleConfirmCloseShift = async (
+    actualCash: number,
+    expectedCash: number,
+    notes?: string
+  ) => {
+    setIsClosingShift(true)
+    try {
+      await closeShift(actualCash, expectedCash, notes)
+      setCloseShiftModalOpen(false)
+      quickLock() // Kunci terminal kembali ke layar PIN setelah shift resmi ditutup
+    } catch (err: any) {
+      alert(`Gagal menutup shift: ${err.message}`)
+    } finally {
+      setIsClosingShift(false)
+    }
+  }
 
   // Auto-dismiss notification timer
   useEffect(() => {
@@ -494,6 +534,7 @@ export function App() {
         cartItemCount={cart.itemCount}
         onOpenMobileCart={() => cart.setCartDrawerOpen(true)}
         currentView={currentView}
+        onOpenCloseShift={() => setCloseShiftModalOpen(true)}
       />
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
@@ -697,6 +738,18 @@ export function App() {
         onConfirmPayment={handleConfirmPayment}
         isProcessing={isProcessingPayment}
       />
+
+      {/* Modal Tutup Kasir */}
+      {activeShift && (
+        <CloseShiftModal
+          opened={closeShiftModalOpen}
+          onClose={() => setCloseShiftModalOpen(false)}
+          startingCash={activeShift.starting_cash}
+          cashSales={currentShiftCashSales}
+          onConfirmClose={handleConfirmCloseShift}
+          isClosing={isClosingShift}
+        />
+      )}
 
       {receiptData && (
         <ReceiptModal
