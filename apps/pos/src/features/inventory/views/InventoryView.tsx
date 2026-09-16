@@ -26,6 +26,8 @@ import {
   batchProduce,
   createIngredient,
   createMenuItem,
+  deleteIngredient,
+  deleteMenuItem, 
   fetchIngredients,
   fetchRecipeByMenuItem,
   restockIngredient,
@@ -137,6 +139,39 @@ export function InventoryView({ products, categories }: InventoryViewProps) {
       alert(err.message || "Gagal memperbarui bahan baku")
     } finally {
       setIsSubmittingEditIng(false)
+    }
+  }
+
+  // ==========================================
+  // STATE & HANDLER: MODAL KONFIRMASI HAPUS (NO ALERT JS)
+  // ==========================================
+  const [deleteTarget, setDeleteTarget] = useState<{
+    type: "MENU_ITEM" | "INGREDIENT"
+    id: string
+    name: string
+    warningText: string
+  } | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  const handleExecuteDelete = async () => {
+    if (!deleteTarget) return
+    setIsDeleting(true)
+    setDeleteError(null)
+    try {
+      if (deleteTarget.type === "MENU_ITEM") {
+        await deleteMenuItem(deleteTarget.id, DEV_COMPANY_ID)
+        await queryClient.invalidateQueries({ queryKey: ["menu-items"] })
+      } else {
+        await deleteIngredient(deleteTarget.id, DEV_COMPANY_ID)
+        await queryClient.invalidateQueries({ queryKey: ["ingredients"] })
+        await queryClient.invalidateQueries({ queryKey: ["menu-items"] })
+      }
+      setDeleteTarget(null)
+    } catch (err: any) {
+      setDeleteError(err.message || "Gagal menghapus data dari server")
+    } finally {
+      setIsDeleting(false)
     }
   }
   
@@ -449,6 +484,25 @@ export function InventoryView({ products, categories }: InventoryViewProps) {
                         >
                           + Stok
                         </Button>
+
+                        {/* Tombol Hapus Menu */}
+                        <Button
+                          size="xs"
+                          variant="subtle"
+                          color="red"
+                          leftSection={<Trash2 size={12} />}
+                          onClick={() => {
+                            setDeleteError(null)
+                            setDeleteTarget({
+                              type: "MENU_ITEM",
+                              id: p.id,
+                              name: p.name,
+                              warningText: "Menu ini akan dinonaktifkan dan otomatis disembunyikan dari katalog kasir.",
+                            })
+                          }}
+                        >
+                          Hapus
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -541,6 +595,25 @@ export function InventoryView({ products, categories }: InventoryViewProps) {
                               }}
                             >
                               + Belanja
+                            </Button>
+
+                            {/* Tombol Hapus Bahan Baku */}
+                            <Button
+                              size="xs"
+                              variant="subtle"
+                              color="red"
+                              leftSection={<Trash2 size={12} />}
+                              onClick={() => {
+                                setDeleteError(null)
+                                setDeleteTarget({
+                                  type: "INGREDIENT",
+                                  id: ing.id,
+                                  name: ing.name,
+                                  warningText: "Seluruh data stok fisik dan relasi resep yang memakai bahan ini akan dihapus permanen.",
+                                })
+                              }}
+                            >
+                              Hapus
                             </Button>
                           </div>
                         </td>
@@ -896,6 +969,73 @@ export function InventoryView({ products, categories }: InventoryViewProps) {
               onClick={handleUpdateIngredient}
             >
               Simpan Perubahan
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ======================================================== */}
+      {/* MODAL 7: KONFIRMASI HAPUS ELEGAN (CUSTOM NO-ALERT JS)     */}
+      {/* ======================================================== */}
+      <Modal
+        opened={deleteTarget !== null}
+        onClose={() => {
+          if (!isDeleting) {
+            setDeleteTarget(null)
+            setDeleteError(null)
+          }
+        }}
+        title={
+          <div className="flex items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-50 text-red-600">
+              <AlertTriangle size={16} strokeWidth={2.5} />
+            </div>
+            <span className="text-sm font-extrabold text-slate-900">Konfirmasi Hapus</span>
+          </div>
+        }
+        centered
+        radius="lg"
+      >
+        <div className="flex flex-col gap-3.5 pt-1">
+          <p className="text-xs text-slate-700 font-medium">
+            Apakah Anda yakin ingin menghapus <strong className="font-extrabold text-slate-900">"{deleteTarget?.name}"</strong>?
+          </p>
+
+          <div className="rounded-xl border border-red-100 bg-red-50/60 p-3 text-xs text-red-800">
+            <p className="font-medium text-[11px] leading-relaxed">
+              ⚠️ {deleteTarget?.warningText}
+            </p>
+          </div>
+
+          {deleteError && (
+            <div className="rounded-lg border border-red-200 bg-red-100/70 p-2.5 text-xs font-semibold text-red-700">
+              {deleteError}
+            </div>
+          )}
+
+          <div className="mt-2 flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
+            <Button
+              variant="default"
+              disabled={isDeleting}
+              onClick={() => {
+                setDeleteTarget(null)
+                setDeleteError(null)
+              }}
+            >
+              Batal
+            </Button>
+            <Button
+              color="red"
+              loading={isDeleting}
+              onClick={handleExecuteDelete}
+              styles={{
+                root: {
+                  fontWeight: 700,
+                  borderRadius: "8px",
+                },
+              }}
+            >
+              Hapus Sekarang
             </Button>
           </div>
         </div>

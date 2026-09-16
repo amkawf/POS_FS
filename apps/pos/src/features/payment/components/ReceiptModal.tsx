@@ -9,6 +9,7 @@ type ReceiptModalProps = {
   orderNumber: string
   orderType: string
   tableNumber?: string
+  cashierName?: string
   items: OrderItem[]
   subtotal: number
   totalAmount: number
@@ -23,6 +24,7 @@ export function ReceiptModal({
   onClose,
   orderNumber,
   orderType,
+  cashierName,
   tableNumber,
   items,
   subtotal,
@@ -90,7 +92,7 @@ export function ReceiptModal({
           )}
           <div className="flex justify-between">
             <span className="text-slate-500">Cashier:</span>
-            <span>POS Terminal 01</span>
+            <span className="font-semibold text-slate-800">{cashierName || "Staf Toko"}</span>
           </div>
         </div>
 

@@ -111,6 +111,7 @@ export type CreateOrderPayload = {
   table_id?: string
   order_type: string
   order_source: string
+  created_by?: string 
   items: CreateOrderItemPayload[]
 }
 
@@ -167,6 +168,7 @@ export type OrderResponse = {
   order_source: string
   status: string
   customer_name?: string
+  created_by?: string
   subtotal: number
   discount_amount: number
   tax_amount: number
@@ -649,4 +651,46 @@ export async function closeCashierShift(payload: CloseShiftPayload): Promise<voi
   if (!response.ok) {
     await parseErrorResponse(response)
   }
+}
+
+// ==========================================
+// API PENGHAPUSAN (DELETE OPERATIONS)
+// ==========================================
+
+// Menghapus bahan baku fisik dari database
+export async function deleteIngredient(
+  id: string,
+  companyId: string,
+): Promise<{ message: string }> {
+  const url = new URL(`${API_BASE_URL}/ingredients/${id}`)
+  url.searchParams.set("company_id", companyId)
+
+  const response = await fetch(url, {
+    method: "DELETE",
+  })
+
+  if (!response.ok) {
+    await parseErrorResponse(response)
+  }
+
+  return response.json()
+}
+
+// Menonaktifkan menu makanan (Soft Delete)
+export async function deleteMenuItem(
+  id: string,
+  companyId: string,
+): Promise<{ message: string }> {
+  const url = new URL(`${API_BASE_URL}/menu-items/${id}`)
+  url.searchParams.set("company_id", companyId)
+
+  const response = await fetch(url, {
+    method: "DELETE",
+  })
+
+  if (!response.ok) {
+    await parseErrorResponse(response)
+  }
+
+  return response.json()
 }

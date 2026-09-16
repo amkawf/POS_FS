@@ -2,6 +2,7 @@ import { Drawer } from "@mantine/core"
 import { Store, UserCheck } from "lucide-react"
 import { ALL_NAV_ITEMS } from "../../config/navigation"
 import type { PosView } from "../../types/navigation"
+import { useAuth } from "../../context/AuthContext"
 
 type MobileNavDrawerProps = {
   opened: boolean
@@ -16,6 +17,13 @@ export function MobileNavDrawer({
   activeView,
   onViewChange,
 }: MobileNavDrawerProps) {
+  const { currentUser } = useAuth()
+  const role = currentUser?.role
+  //  Saring item menu
+  const allowedNavItems = ALL_NAV_ITEMS.filter(
+    (item) => !role || item.roles.includes(role)
+  )
+
   const handleItemClick = (view: PosView) => {
     onViewChange(view)
     onClose()
@@ -58,7 +66,7 @@ export function MobileNavDrawer({
     >
       <div className="flex flex-1 flex-col justify-between p-3">
         <nav className="space-y-1">
-          {ALL_NAV_ITEMS.map((item) => {
+          {allowedNavItems.map((item) => {
             const Icon = item.icon
             const isActive = activeView === item.view
 
@@ -87,8 +95,8 @@ export function MobileNavDrawer({
               AM
             </div>
             <div>
-              <div className="text-xs font-bold text-slate-900">Cashier</div>
-              <div className="text-[10px] text-slate-400 font-medium">Shift Pagi • Online</div>
+              <div className="text-xs font-bold text-slate-900">{currentUser?.name || "Staf"}</div>
+              <div className="text-[10px] text-blue-600 font-bold uppercase">{currentUser?.role || "GUEST"}</div>
             </div>
           </div>
           <div className="mt-2.5 flex items-center gap-1.5 border-t border-slate-200/70 pt-2 text-[10px] font-semibold text-emerald-600">

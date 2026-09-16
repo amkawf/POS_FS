@@ -8,12 +8,14 @@ type PaymentsViewProps = {
   completedOrders: OrderResponse[]
   tables: Table[]
   onOpenReceipt: (order: OrderResponse) => void
+  getCashierName: (userId?: string) => string
 }
 
 export function PaymentsView({
   completedOrders,
   tables,
   onOpenReceipt,
+  getCashierName,
 }: PaymentsViewProps) {
   return (
     <div className="flex-1 overflow-y-auto bg-slate-50 p-4 sm:p-6">
@@ -47,6 +49,7 @@ export function PaymentsView({
                 <tr>
                   <th className="px-5 py-3">No. Order</th>
                   <th className="px-5 py-3">Waktu</th>
+                  <th className="px-5 py-3">Kasir</th>
                   <th className="px-5 py-3">Tipe / Meja</th>
                   <th className="px-5 py-3">Status</th>
                   <th className="px-5 py-3 text-right">Total Pembayaran</th>
@@ -69,6 +72,11 @@ export function PaymentsView({
                           hour: "2-digit",
                           minute: "2-digit",
                         })}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                          {getCashierName(ord.created_by)}
+                        </span>
                       </td>
                       <td className="px-5 py-3.5">
                         <div className="font-bold text-slate-800">{ord.order_type}</div>

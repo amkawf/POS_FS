@@ -1,6 +1,7 @@
 import { Store } from "lucide-react"
 import { BOTTOM_NAV_ITEMS, MAIN_NAV_ITEMS } from "../../config/navigation"
 import type { PosView } from "../../types/navigation"
+import { useAuth } from "../../context/AuthContext"
 
 type SidebarProps = {
   activeView: PosView
@@ -8,6 +9,17 @@ type SidebarProps = {
 }
 
 export function Sidebar({ activeView, onViewChange }: SidebarProps) {
+  const { currentUser } = useAuth()
+  const role = currentUser?.role
+  
+  //  Saring menu berdasarkan hak akses peran (RBAC)
+  const allowedMainMenu = MAIN_NAV_ITEMS.filter(
+    (item) => !role || item.roles.includes(role)
+  )
+  const allowedBottomMenu = BOTTOM_NAV_ITEMS.filter(
+    (item) => !role || item.roles.includes(role)
+  )
+
   return (
     <aside className="hidden lg:flex w-56 shrink-0 flex-col border-r border-slate-200 bg-white select-none">
       <div className="flex h-14 items-center border-b border-slate-200 px-4">
@@ -21,7 +33,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
 
       <nav className="flex-1 overflow-y-auto p-2.5">
         <div className="space-y-1">
-          {MAIN_NAV_ITEMS.map((item) => {
+          {allowedMainMenu.map((item) => {
             const Icon = item.icon
             const isActive = activeView === item.view
 
@@ -45,7 +57,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
       </nav>
 
       <div className="border-t border-slate-200 p-2.5 space-y-1">
-        {BOTTOM_NAV_ITEMS.map((item) => {
+        {allowedBottomMenu.map((item) => {
           const Icon = item.icon
           const isActive = activeView === item.view
 

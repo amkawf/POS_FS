@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Badge, Button, Loader, Modal, NumberInput } from "@mantine/core"
-import { Delete, KeyRound, Lock, ShieldCheck, Store, UserCheck, Utensils } from "lucide-react"
+import { Delete, Lock, ShieldCheck, Store } from "lucide-react"
 import { useAuth } from "../../../context/AuthContext"
 import { fetchStoreStaff } from "../../../api"
-import { formatRupiah } from "../../../utils/currency"
 
 export function LockScreenView() {
   const { storeId, loginWithPin, openShift, activeShift } = useAuth()

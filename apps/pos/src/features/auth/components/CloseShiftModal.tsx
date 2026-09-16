@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
-import { Button, Modal, NumberInput, Textarea, Badge } from "@mantine/core"
-import { AlertTriangle, CheckCircle2, DollarSign, ReceiptText, ShieldAlert } from "lucide-react"
+import { Button, Modal, NumberInput, Textarea } from "@mantine/core"
+import { AlertTriangle, CheckCircle2, ReceiptText, ShieldAlert } from "lucide-react"
 import { formatRupiah } from "../../../utils/currency"
 
 type CloseShiftModalProps = {

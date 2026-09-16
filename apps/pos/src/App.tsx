@@ -41,6 +41,7 @@ import {
   fetchMenuItems,
   fetchOrderById,
   fetchOrders,
+  fetchStoreStaff,
   fetchTables,
   payOrder,
   updateTableStatus,
@@ -58,7 +59,7 @@ import { LockScreenView } from "./features/auth/views/LockScreenView"
 import { CloseShiftModal } from "./features/auth/components/CloseShiftModal" 
 
 export function App() {
-  const { isLocked, activeShift, closeShift, quickLock } = useAuth()
+  const { currentUser, isLocked, activeShift, closeShift, quickLock } = useAuth()
 
   // GATEKEEPER: Tahan render jika kasir/terminal sedang terkunci
   if (isLocked) {
@@ -98,6 +99,7 @@ export function App() {
     orderNumber: string
     orderType: string
     tableNumber?: string
+    cashierName?: string
     items: OrderItem[]
     subtotal: number
     totalAmount: number
@@ -137,6 +139,19 @@ export function App() {
     queryFn: () => fetchOrders(DEV_COMPANY_ID, DEV_STORE_ID, "COMPLETED"),
     refetchInterval: 15000,
   })
+
+  const staffQuery = useQuery({
+  queryKey: ["store-staff", DEV_STORE_ID],
+  queryFn: () => fetchStoreStaff(DEV_STORE_ID),
+})
+const staffList = staffQuery.data ?? []
+// Kamus penerjemah: UUID -> Nama Staf
+const getCashierName = (userId?: string) => {
+  if (!userId) return "Staf Toko"
+  const found = staffList.find((s) => s.id === userId)
+  if (found) return found.name
+  return currentUser?.id === userId ? currentUser.name : "Staf Toko"
+  }
 
   const tables = tablesQuery.data ?? []
   const openOrders = openOrdersQuery.data ?? []
@@ -213,6 +228,7 @@ export function App() {
       table_id: cart.orderType === "DINE_IN" ? cart.selectedTable?.id : undefined,
       order_type: cart.orderType,
       order_source: "POS",
+      created_by: currentUser?.id,
       items: cart.orderItems.map((item) => ({
         menu_item_id: item.menuItemId,
         item_name: item.name,
@@ -266,6 +282,7 @@ export function App() {
         orderNumber: fullOrder.order_number,
         orderType: fullOrder.order_type,
         tableNumber: targetTableNumber,
+        cashierName: getCashierName(fullOrder.created_by),
         items,
         subtotal: fullOrder.subtotal,
         totalAmount: fullOrder.total_amount,
@@ -298,6 +315,7 @@ export function App() {
           table_id: cart.orderType === "DINE_IN" ? cart.selectedTable?.id : undefined,
           order_type: cart.orderType,
           order_source: "POS",
+          created_by: currentUser?.id,
           items: cart.orderItems.map((item) => ({
             menu_item_id: item.menuItemId,
             item_name: item.name,
@@ -329,6 +347,7 @@ export function App() {
         orderNumber: paidOrder.order_number || targetOrderNumber || "ORD-DONE",
         orderType: paidOrder.order_type || targetOrderType,
         tableNumber: targetTableNumber,
+        cashierName: currentUser?.name,
         items: [...cart.orderItems],
         subtotal: paidOrder.subtotal || finalSubtotal,
         totalAmount: paidOrder.total_amount || finalTotal,
@@ -680,6 +699,7 @@ export function App() {
             completedOrders={completedOrders}
             tables={tables}
             onOpenReceipt={handleOpenReceiptFromPayment}
+            getCashierName={getCashierName}
           />
         )}
 
@@ -761,6 +781,7 @@ export function App() {
           orderNumber={receiptData.orderNumber}
           orderType={receiptData.orderType}
           tableNumber={receiptData.tableNumber}
+          cashierName={receiptData.cashierName}
           items={receiptData.items}
           subtotal={receiptData.subtotal}
           totalAmount={receiptData.totalAmount}
