@@ -1,0 +1,26 @@
+services:
+  backend:
+    build: ./backend
+    container_name: pos-backend
+    ports:
+      - "8081:8080"
+    env_file:
+      - .env
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: pos-frontend
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+    depends_on:
+      - backend
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: pos-tunnel
+    command: tunnel --no-autoupdate --url http://frontend:80
+    restart: unless-stopped
+    depends_on:
+      - frontend
