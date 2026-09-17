@@ -58,6 +58,18 @@ import { useAuth } from "./context/AuthContext"
 import { LockScreenView } from "./features/auth/views/LockScreenView"
 import { CloseShiftModal } from "./features/auth/components/CloseShiftModal" 
 
+export function getDefaultPathRole(role?: string): string {
+  if (role == "KITCHEN") {
+    return "/kitchen";
+  } else if (role == "MANAGER") {
+    return "/";
+  } else if (role == "OWNER") {
+    return "/dashboard";
+  } else {
+    return "/";
+  }
+}
+
 export function App() {
   const { currentUser, isLocked, activeShift, closeShift, quickLock } = useAuth()
 
@@ -81,6 +93,23 @@ export function App() {
       navigate(target.path)
     }
   }
+
+  // ROUTE GUARD & LANDING REDIRECT
+  useEffect(() => {
+    if (!currentUser) return
+
+    // Cari apakah rute saat ini ada di daftar navigasi
+    const targetItem = ALL_NAV_ITEMS.find((item) => item.path === location.pathname)
+
+    // Cek apakah role user ada di dalam daftar roles yang diizinkan
+    const isAllowed = targetItem ? targetItem.roles.includes(currentUser.role) : true
+
+    // Jika rute tidak diizinkan, lempar balik ke rumah utama mereka
+    if (!isAllowed) {
+      const homePath = getDefaultPathRole(currentUser.role)
+      navigate(homePath, { replace: true })
+    }
+  }, [location.pathname, currentUser, navigate])
 
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
