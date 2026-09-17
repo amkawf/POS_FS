@@ -11,12 +11,19 @@ export function useOrderCart() {
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false)
 
   const addProduct = (product: Product) => {
+    if (product.stock !== undefined && product.stock <= 0) {
+      return
+    }
+
     setOrderItems((currentItems) => {
       const existingItem = currentItems.find(
         (item) => item.menuItemId === product.id,
       )
 
       if (existingItem) {
+        if (product.stock !== undefined && existingItem.qty >= product.stock) {
+          return currentItems
+        }
         return currentItems.map((item) =>
           item.menuItemId === product.id
             ? { ...item, qty: item.qty + 1 }

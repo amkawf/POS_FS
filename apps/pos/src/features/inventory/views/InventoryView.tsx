@@ -22,7 +22,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import type { Category, Product, Ingredient } from "../../../types/pos"
 import { formatRupiah } from "../../../utils/currency"
 import {
-  adjustStock,
   batchProduce,
   createIngredient,
   createMenuItem,
@@ -193,14 +192,12 @@ export function InventoryView({ products, categories }: InventoryViewProps) {
     return q === "" || ing.name.toLowerCase().includes(q) || (ing.code && ing.code.toLowerCase().includes(q))
   })
 
-    // HANDLER: Produksi Masak Batch atau Penyesuaian Stok Manual
+  // HANDLER: Produksi Masak Batch (Khusus Batch Cooking)
   const handleAdjustStock = async () => {
     if (!selectedProduct || adjustQty <= 0) return
     setIsSubmittingStock(true)
     try {
-          const isBatch = !selectedProduct.fulfillment_type || selectedProduct.fulfillment_type === "BATCH_COOKING"
-    if (isBatch) {
-      // 🍳 1. Jalankan konversi bahan baku -> makanan jadi
+      // 🍳 Jalankan konversi bahan baku -> makanan jadi di dapur
       await batchProduce({
         company_id: DEV_COMPANY_ID,
         store_id: DEV_STORE_ID,
@@ -208,16 +205,7 @@ export function InventoryView({ products, categories }: InventoryViewProps) {
         portions: adjustQty,
         notes: adjustNotes.trim() || `Produksi masak batch (+${adjustQty} porsi)`,
       })
-    } else {
-      // 📦 2. Jika Made-to-Order / manual opname
-      await adjustStock({
-        company_id: DEV_COMPANY_ID,
-        store_id: DEV_STORE_ID,
-        menu_item_id: selectedProduct.id,
-        quantity: adjustQty,
-        notes: adjustNotes.trim() || `Restock manual (+${adjustQty})`,
-      })
-    }
+
       // Refresh KEDUA cache: Makanan Jadi & Gudang Bahan Baku Mentah!
       await queryClient.invalidateQueries({ queryKey: ["menu-items"] })
       await queryClient.invalidateQueries({ queryKey: ["ingredients"] })
@@ -290,6 +278,7 @@ export function InventoryView({ products, categories }: InventoryViewProps) {
         }))
 
       await saveRecipe(recipeTargetProduct.id, validItems)
+      await queryClient.invalidateQueries({ queryKey: ["menu-items"] })
       alert("Resep berhasil disimpan!")
       setRecipeTargetProduct(null)
     } catch (err) {
@@ -336,6 +325,7 @@ export function InventoryView({ products, categories }: InventoryViewProps) {
         notes: restockIngNotes.trim(),
       })
       await queryClient.invalidateQueries({ queryKey: ["ingredients"] })
+      await queryClient.invalidateQueries({ queryKey: ["menu-items"] })
       setRestockTargetIng(null)
     } catch (err) {
       alert(`Gagal menambah stok belanja: ${(err as Error).message}`)
@@ -457,6 +447,11 @@ export function InventoryView({ products, categories }: InventoryViewProps) {
                           {p.stock !== undefined ? `${p.stock} Porsi` : "Tersedia"}
                         </Badge>
                       )}
+                      {p.fulfillment_type === "MADE_TO_ORDER" && (
+                        <div className="text-[10px] font-semibold text-teal-600 mt-0.5">
+                          (Dihitung dari bahan baku)
+                        </div>
+                      )}
                     </td>
                     <td className="px-5 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-1.5">
@@ -471,19 +466,21 @@ export function InventoryView({ products, categories }: InventoryViewProps) {
                           Resep
                         </Button>
 
-                        {/* Tombol Tambah Stok Manual */}
-                        <Button
-                          size="xs"
-                          variant="light"
-                          color="blue"
-                          leftSection={<Plus size={12} />}
-                          onClick={() => {
-                            setSelectedProduct(p)
-                            setAdjustQty(20)
-                          }}
-                        >
-                          + Stok
-                        </Button>
+                        {/* Tombol Masak Batch: HANYA untuk Batch Cooking */}
+                        {p.fulfillment_type !== "MADE_TO_ORDER" && (
+                          <Button
+                            size="xs"
+                            variant="light"
+                            color="blue"
+                            leftSection={<Plus size={12} />}
+                            onClick={() => {
+                              setSelectedProduct(p)
+                              setAdjustQty(20)
+                            }}
+                          >
+                            + Masak
+                          </Button>
+                        )}
 
                         {/* Tombol Hapus Menu */}
                         <Button
@@ -635,9 +632,7 @@ export function InventoryView({ products, categories }: InventoryViewProps) {
         onClose={() => setSelectedProduct(null)}
         title={
           <span className="text-sm font-bold text-slate-900">
-            {selectedProduct?.fulfillment_type === "MADE_TO_ORDER"
-              ? `Koreksi Stok: ${selectedProduct?.name}`
-              : `🍳 Produksi Masak Dapur: ${selectedProduct?.name}`}
+            🍳 Produksi Masak Dapur: {selectedProduct?.name}
           </span>
         }
         centered
@@ -646,34 +641,32 @@ export function InventoryView({ products, categories }: InventoryViewProps) {
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
             <div>SKU: <span className="font-mono font-bold text-slate-800">{selectedProduct?.sku}</span></div>
             <div className="mt-1">
-              Stok Saat Ini: <span className="font-bold text-blue-600">{selectedProduct?.stock ?? 0} Porsi</span>
+              Stok Porsi Siap Saji Saat Ini: <span className="font-bold text-blue-600">{selectedProduct?.stock ?? 0} Porsi</span>
             </div>
-            {selectedProduct?.fulfillment_type !== "MADE_TO_ORDER" && (
-              <div className="mt-2 text-[11px] text-amber-700 bg-amber-50 rounded p-2 border border-amber-200">
-                ⚡ <strong>Konversi Otomatis:</strong> Memasak porsi ini akan otomatis memotong stok bahan baku di gudang sesuai takaran resep.
-              </div>
-            )}
+            <div className="mt-2 text-[11px] text-amber-700 bg-amber-50 rounded p-2 border border-amber-200">
+              ⚡ <strong>Konversi Otomatis:</strong> Memasak porsi ini akan otomatis memotong stok bahan baku di gudang sesuai takaran resep.
+            </div>
           </div>
           <NumberInput
-            label={selectedProduct?.fulfillment_type === "MADE_TO_ORDER" ? "Jumlah Penyesuaian Porsi" : "Jumlah Porsi yang Dimasak"}
+            label="Jumlah Porsi yang Dimasak"
             value={adjustQty}
             onChange={(val) => setAdjustQty(typeof val === "number" ? val : 0)}
             min={1}
           />
           <TextInput
             label="Catatan Mutasi"
-            placeholder={selectedProduct?.fulfillment_type === "MADE_TO_ORDER" ? "Koreksi stok" : "Masak batch makan siang"}
+            placeholder="Contoh: Masak batch makan siang"
             value={adjustNotes}
             onChange={(e) => setAdjustNotes(e.currentTarget.value)}
           />
           <div className="mt-2 flex justify-end gap-2">
             <Button variant="default" onClick={() => setSelectedProduct(null)}>Batal</Button>
             <Button
-              color={selectedProduct?.fulfillment_type === "MADE_TO_ORDER" ? "blue" : "teal"}
+              color="teal"
               loading={isSubmittingStock}
               onClick={handleAdjustStock}
             >
-              {selectedProduct?.fulfillment_type === "MADE_TO_ORDER" ? "Simpan Porsi" : "🍳 Mulai Masak & Potong Bahan"}
+              🍳 Mulai Masak & Potong Bahan
             </Button>
           </div>
         </div>
