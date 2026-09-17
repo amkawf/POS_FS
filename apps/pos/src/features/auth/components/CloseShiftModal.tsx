@@ -8,6 +8,8 @@ type CloseShiftModalProps = {
   onClose: () => void
   startingCash: number
   cashSales: number
+  cashOrderCount?: number
+  cashierName?: string 
   onConfirmClose: (actualCash: number, expectedCash: number, notes?: string) => Promise<void>
   isClosing: boolean
 }
@@ -17,6 +19,8 @@ export function CloseShiftModal({
   onClose,
   startingCash,
   cashSales,
+  cashOrderCount,
+  cashierName,  
   onConfirmClose,
   isClosing,
 }: CloseShiftModalProps) {
@@ -66,14 +70,29 @@ export function CloseShiftModal({
             Perhitungan Sistem (Audited)
           </div>
           <div className="space-y-1.5">
+            {/* 1. Baris Nama Kasir */}
+            {cashierName && (
+              <div className="flex justify-between">
+                <span className="text-slate-500">Kasir Bertugas:</span>
+                <span className="font-semibold text-slate-800">{cashierName}</span>
+              </div>
+            )}
+
+            {/* 2. Baris Modal Kas Awal */}
             <div className="flex justify-between">
               <span className="text-slate-500">Modal Kas Awal:</span>
               <span className="font-mono font-bold text-slate-700">{formatRupiah(startingCash)}</span>
             </div>
+
+            {/* 3. Baris Penjualan Tunai + Jumlah Nota */}
             <div className="flex justify-between">
               <span className="text-slate-500">Total Penjualan Tunai (CASH):</span>
-              <span className="font-mono font-bold text-emerald-600">+{formatRupiah(cashSales)}</span>
+              <span className="font-mono font-bold text-emerald-600">
+                +{formatRupiah(cashSales)} {cashOrderCount !== undefined && `(${cashOrderCount} nota)`}
+              </span>
             </div>
+
+            {/* 4. Baris Total Seharusnya */}
             <div className="border-t border-slate-200/80 pt-1.5 flex justify-between text-slate-900 font-extrabold">
               <span>Kas Seharusnya di Laci:</span>
               <span className="font-mono text-sm text-blue-700">{formatRupiah(expectedCash)}</span>

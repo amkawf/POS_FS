@@ -188,14 +188,29 @@ const getCashierName = (userId?: string) => {
   const allOrders = [...openOrders, ...completedOrders]
   const products = menuItemsQuery.data ?? []
 
-    // 💵 Hitung total uang tunai yang masuk ke laci selama shift ini
-  const currentShiftCashSales = completedOrders
-    .filter((order) => {
-      const isCash = (order.notes || "").includes("Payment: CASH")
-      if (!activeShift?.opened_at) return isCash
-      return isCash && new Date(order.opened_at) >= new Date(activeShift.opened_at)
-    })
-    .reduce((sum, ord) => sum + ord.total_amount, 0)
+  // Hitung total uang tunai yang masuk ke laci selama shift ini
+  // Filter transaksi tunai sah yang masuk ke laci kasir pada shift ini
+  const currentShiftCashOrders = completedOrders.filter((order) => {
+    // 1. Wajib pembayaran tunai (CASH)
+    const isCash = (order.notes || "").includes("Payment: CASH")
+    if (!isCash) return false
+    // 2. Waktu transaksi harus setelah kasir membuka shift
+    if (activeShift?.opened_at && new Date(order.opened_at) < new Date(activeShift.opened_at)) {
+      return false
+    }
+    // 3. Hak milik kasir: Hanya order yang dibuat oleh kasir pemegang shift ini
+    if (activeShift?.user_id && order.created_by && order.created_by !== activeShift.user_id) {
+      return false
+    }
+    return true
+  })
+  // Total nominal rupiah tunai di laci
+  const currentShiftCashSales = currentShiftCashOrders.reduce(
+    (sum, ord) => sum + ord.total_amount,
+    0
+  )
+  // Jumlah nota transaksi tunai (untuk laporan kasir)
+  const currentShiftCashCount = currentShiftCashOrders.length
 
   // Handler konfirmasi tutup shift
   const handleConfirmCloseShift = async (
@@ -795,11 +810,13 @@ const getCashierName = (userId?: string) => {
           onClose={() => setCloseShiftModalOpen(false)}
           startingCash={activeShift.starting_cash}
           cashSales={currentShiftCashSales}
+          cashOrderCount={currentShiftCashCount} // 👈 Oper jumlah nota
+          cashierName={activeShift.user_name || currentUser?.name} // 👈 Oper nama kasir
           onConfirmClose={handleConfirmCloseShift}
           isClosing={isClosingShift}
         />
       )}
-
+      
       {receiptData && (
         <ReceiptModal
           opened={receiptModalOpen}
