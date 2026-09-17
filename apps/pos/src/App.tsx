@@ -754,9 +754,11 @@ const getCashierName = (userId?: string) => {
           />
         )}
 
-        {currentView === "REPORTS" && (
+                {currentView === "REPORTS" && (
           <ReportsView
             completedOrders={completedOrders}
+            activeShift={activeShift} // 👈 Oper data shift kasir aktif
+            getCashierName={getCashierName} // 👈 Oper translator nama kasir
           />
         )}
 
@@ -816,7 +818,7 @@ const getCashierName = (userId?: string) => {
           isClosing={isClosingShift}
         />
       )}
-      
+
       {receiptData && (
         <ReceiptModal
           opened={receiptModalOpen}
