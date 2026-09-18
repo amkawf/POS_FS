@@ -142,7 +142,7 @@ export function InventoryView({ products, categories }: InventoryViewProps) {
   }
 
   // ==========================================
-  // STATE & HANDLER: MODAL KONFIRMASI HAPUS (NO ALERT JS)
+  // STATE & HANDLER: MODAL KONFIRMASI HAPUS 
   // ==========================================
   const [deleteTarget, setDeleteTarget] = useState<{
     type: "MENU_ITEM" | "INGREDIENT"
@@ -481,7 +481,6 @@ export function InventoryView({ products, categories }: InventoryViewProps) {
                             + Masak
                           </Button>
                         )}
-
                         {/* Tombol Hapus Menu */}
                         <Button
                           size="xs"

@@ -1,0 +1,9 @@
+export const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ??
+  (typeof window !== "undefined"
+    ? `${window.location.origin}/api/v1`
+    : "http://localhost:8080/api/v1")
+
+export const DEV_COMPANY_ID = "11111111-1111-1111-1111-111111111111"
+export const DEV_STORE_ID = "22222222-2222-2222-2222-222222222222"
+
