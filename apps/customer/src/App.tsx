@@ -10,11 +10,12 @@ import {
   Search,
   ShoppingBag,
   Trash2,
+  Receipt,
   UtensilsCrossed,
   X,
 } from "lucide-react"
 import { DEV_COMPANY_ID, DEV_STORE_ID } from "./config"
-import { fetchMenuItems, fetchMenuCategories, fetchTables, submitCustomerOrder } from "./api"
+import { fetchMenuItems, fetchMenuCategories, fetchTables, submitCustomerOrder, fetchActiveOrdersByTable } from "./api"
 import type { CustomerCartItem, Product, Table } from "./types"
 
 // Helper format mata uang Rupiah
@@ -32,7 +33,7 @@ export default function App() {
   const tableParam = urlParams.get("table") || urlParams.get("t") || ""
 
   // State lokal
-  const [selectedTableNumber, setSelectedTableNumber] = useState(tableParam)
+  const selectedTableNumber = tableParam
   const [customerName, setCustomerName] = useState("")
   const [activeCategory, setActiveCategory] = useState<string>("ALL")
   const [searchQuery, setSearchQuery] = useState("")
@@ -66,11 +67,20 @@ export default function App() {
   // Cocokkan meja yang dipilih dengan data meja di database
   const currentTable: Table | undefined = useMemo(() => {
     if (!selectedTableNumber) return undefined
-    return tables.find(
-      (t) =>
-        t.table_number.toLowerCase() === selectedTableNumber.toLowerCase() ||
-        t.id === selectedTableNumber,
-    )
+
+    // 1. Bersihkan kata "meja" dan spasi (misal "Meja 03" atau "03" disederhanakan jadi "03")
+    const cleanParam = selectedTableNumber.toLowerCase().replace("meja", "").trim()
+
+    return tables.find((t) => {
+      const cleanDb = t.table_number.toLowerCase().replace("meja", "").trim()
+
+      // 2. Cocokkan string teks, angka, atau UUID ID meja
+      return (
+        cleanDb === cleanParam ||
+        parseInt(cleanDb, 10) === parseInt(cleanParam, 10) ||
+        t.id === selectedTableNumber
+      )
+    })
   }, [tables, selectedTableNumber])
 
   // Hitung total item & harga di keranjang
@@ -177,12 +187,37 @@ export default function App() {
       })
       setCart([])
       setIsCartOpen(false)
+      refetchActiveOrders()
     } catch (err: any) {
       setOrderError(err.message || "Gagal mengirim pesanan ke dapur. Silakan coba lagi.")
     } finally {
       setIsSubmitting(false)
     }
   }
+
+  // State untuk buka/tutup drawer pesanan meja
+  const [isTableOrdersOpen, setIsTableOrdersOpen] = useState(false)
+
+  // Ambil data semua pesanan aktif meja ini (otomatis polling setiap 6 detik)
+  const {
+    data: activeOrders = [],
+    isLoading: isLoadingActiveOrders,
+    refetch: refetchActiveOrders,
+  } = useQuery({
+    queryKey: ["customer-active-orders", currentTable?.id],
+    queryFn: () => fetchActiveOrdersByTable(DEV_COMPANY_ID, DEV_STORE_ID, currentTable!.id),
+    enabled: !!currentTable?.id,
+    refetchInterval: 6000,
+  })
+
+  // Hitung akumulasi dari semua kloter pesanan
+  const activeItemsCount = activeOrders.reduce(
+    (sum, ord) => sum + (ord.items || []).reduce((acc, it) => acc + it.quantity, 0),
+    0,
+  )
+  const tableSubtotal = activeOrders.reduce((sum, ord) => sum + ord.subtotal, 0)
+  const tableTax = activeOrders.reduce((sum, ord) => sum + ord.tax_amount, 0)
+  const tableTotal = activeOrders.reduce((sum, ord) => sum + ord.total_amount, 0)
 
   // =========================================================================
   // VIEW: TAMPILAN SUKSES SETELAH ORDER TERKIRIM
@@ -249,8 +284,9 @@ export default function App() {
     <div className="flex min-h-screen flex-col bg-slate-50 pb-28">
       {/* HEADER ATAS KHUSUS MOBILE */}
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur-md">
-        <div className="mx-auto flex max-w-2xl items-center justify-between">
+                <div className="mx-auto flex max-w-2xl items-center justify-between">
           <div className="flex items-center gap-2.5">
+            {/* Logo & Info Meja (sudah ada) */}
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm shadow-blue-500/30">
               <UtensilsCrossed size={18} />
             </div>
@@ -261,7 +297,7 @@ export default function App() {
                 <span>•</span>
                 {currentTable ? (
                   <span className="font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
-                    Meja {currentTable.table_number}
+                    {currentTable.table_number}
                   </span>
                 ) : (
                   <span className="text-amber-600 font-bold">Meja Belum Dipilih</span>
@@ -270,21 +306,22 @@ export default function App() {
             </div>
           </div>
 
-          {/* PILIH MEJA DROPDOWN (Jika scan tanpa parameter) */}
-          <div className="flex items-center gap-1.5">
-            <select
-              value={selectedTableNumber}
-              onChange={(e) => setSelectedTableNumber(e.target.value)}
-              className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-500"
+          {/* 👉 TOMBOL BARU: PESANAN MEJA (MENGGANTIKAN DROPDOWN) */}
+          {currentTable && (
+            <button
+              type="button"
+              onClick={() => setIsTableOrdersOpen(true)}
+              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-100 hover:border-slate-300 active:scale-95 transition-all cursor-pointer"
             >
-              <option value="">Pilih Meja</option>
-              {tables.map((t) => (
-                <option key={t.id} value={t.table_number}>
-                  Meja {t.table_number}
-                </option>
-              ))}
-            </select>
-          </div>
+              <Receipt size={15} className="text-blue-600" />
+              <span>Pesanan Meja</span>
+              {activeItemsCount > 0 && (
+                <span className="flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-extrabold text-white">
+                  {activeItemsCount}
+                </span>
+              )}
+            </button>
+          )}
         </div>
 
         {/* INPUT NAMA TAMU & SEARCH */}
@@ -464,6 +501,114 @@ export default function App() {
         </div>
       )}
 
+
+            {/* DRAWER PESANAN AKTIF MEJA (SLIDE-OVER DARI KANAN SEPERTI POS) */}
+      {isTableOrdersOpen && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/60 backdrop-blur-xs">
+          {/* Klik backdrop luar untuk menutup */}
+          <div className="fixed inset-0" onClick={() => setIsTableOrdersOpen(false)} />
+
+          <div className="relative flex h-full w-full max-w-sm sm:max-w-md flex-col bg-white shadow-2xl animate-in slide-in-from-right duration-200 z-10">
+            {/* Header Drawer */}
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                  <Receipt size={18} />
+                </div>
+                <div>
+                  <h2 className="text-sm font-extrabold text-slate-900">Pesanan {currentTable?.table_number}</h2>
+                  <p className="text-[11px] font-semibold text-slate-500">
+                    {activeOrders.length > 0
+                      ? `${activeOrders.length} Kloter Pesanan (${activeItemsCount} item)`
+                      : "Belum ada pesanan aktif"}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsTableOrdersOpen(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 active:scale-95 cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Konten Daftar Menu yang Sedang Dipesan */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              {isLoadingActiveOrders ? (
+                <div className="py-12 text-center text-xs font-semibold text-slate-400">
+                  Memuat pesanan meja...
+                </div>
+              ) : activeOrders.length === 0 ? (
+                <div className="py-12 text-center text-slate-400">
+                  <ChefHat size={36} className="mx-auto mb-2 text-slate-300" />
+                  <p className="text-xs font-bold text-slate-600">Belum ada pesanan untuk meja ini</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Pesanan yang kamu kirim akan muncul di sini</p>
+                </div>
+              ) : (
+                activeOrders.map((ord, idx) => (
+                  <div key={ord.id} className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs space-y-2.5">
+                    {/* Header per kloter pesanan */}
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="rounded bg-blue-50 px-2 py-0.5 text-[10px] font-extrabold text-blue-700">
+                          Kloter #{idx + 1}
+                        </span>
+                        <span className="font-mono text-[11px] font-bold text-slate-700">
+                          #{ord.order_number}
+                        </span>
+                      </div>
+                      <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[9px] font-extrabold uppercase text-emerald-700">
+                        {ord.status}
+                      </span>
+                    </div>
+
+                    {/* Item dalam kloter ini */}
+                    <div className="space-y-1.5">
+                      {(ord.items || []).map((it) => (
+                        <div key={it.id} className="flex items-start justify-between text-xs">
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className="flex h-5 w-5 items-center justify-center rounded-md bg-slate-100 text-[11px] font-black text-slate-700">
+                                {it.quantity}x
+                              </span>
+                              <span className="font-semibold text-slate-800">{it.item_name}</span>
+                            </div>
+                            {it.notes && (
+                              <p className="text-[11px] italic text-slate-400 pl-7">Catatan: {it.notes}</p>
+                            )}
+                          </div>
+                          <span className="font-mono font-bold text-slate-800">
+                            {formatRupiah(it.total_amount || it.unit_price * it.quantity)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Footer Total Tagihan Sementara Seluruh Meja */}
+            {activeOrders.length > 0 && (
+              <div className="border-t border-slate-100 bg-slate-50/80 p-4 space-y-2">
+                <div className="flex justify-between text-xs text-slate-500 font-medium">
+                  <span>Subtotal</span>
+                  <span>{formatRupiah(tableSubtotal)}</span>
+                </div>
+                <div className="flex justify-between text-xs text-slate-500 font-medium">
+                  <span>Pajak Restoran (10%)</span>
+                  <span>{formatRupiah(tableTax)}</span>
+                </div>
+                <div className="flex justify-between text-sm font-black text-slate-900 pt-2 border-t border-slate-200">
+                  <span>Total Tagihan Meja</span>
+                  <span className="text-blue-600">{formatRupiah(tableTotal)}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       {/* CART DRAWER / BOTTOM SHEET MODAL */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/60 backdrop-blur-xs p-0 sm:p-4">

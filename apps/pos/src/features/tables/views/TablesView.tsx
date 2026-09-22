@@ -18,6 +18,7 @@ type TablesViewProps = {
   selectedTableId: string | null
   onSelectTableForOrder: (table: Table) => void
   onSelectOrder?: (order: OrderResponse) => void
+  onSelectTableOrders?: (table: Table, orders: OrderResponse[]) => void
   onReleaseTable?: (tableId: string) => Promise<void>
 }
 
@@ -27,6 +28,7 @@ export function TablesView({
   selectedTableId,
   onSelectTableForOrder,
   onSelectOrder,
+  onSelectTableOrders,
   onReleaseTable,
 }: TablesViewProps) {
   const [filterStatus, setFilterStatus] = useState<string>("ALL")
@@ -132,8 +134,10 @@ export function TablesView({
           const isOccupied = tbl.status === "OCCUPIED"
           const isAvailable = tbl.status === "AVAILABLE"
 
-          // Find active open order for this table
-          const activeOrder = openOrders.find((o) => o.table_id === tbl.id)
+          // Ambil seluruh pesanan aktif (OPEN) untuk meja ini (Multi-Kloter)
+          const tableOrders = openOrders.filter((o) => o.table_id === tbl.id)
+          const tableTotal = tableOrders.reduce((sum, o) => sum + o.total_amount, 0)
+          const activeOrder = tableOrders[0]
 
           return (
             <div
@@ -191,10 +195,14 @@ export function TablesView({
                 {/* Active Order Card for Occupied Tables */}
                 {isOccupied && (
                   <div className="mt-3.5 rounded-lg border border-amber-200/90 bg-amber-50/70 p-2.5">
-                    {activeOrder ? (
+                    {tableOrders.length > 0 ? (
                       <div>
                         <div className="flex items-center justify-between text-[11px] font-bold text-amber-900">
-                          <span className="truncate">Order #{activeOrder.order_number}</span>
+                          <span className="truncate">
+                            {tableOrders.length > 1
+                              ? `${tableOrders.length} Pesanan Aktif (${tableOrders.length} Kloter)`
+                              : `Order #${tableOrders[0].order_number}`}
+                          </span>
                           <span className="shrink-0 rounded bg-amber-200/70 px-1.5 py-0.5 text-[9px] font-extrabold uppercase text-amber-800">
                             Aktif
                           </span>
@@ -202,10 +210,10 @@ export function TablesView({
 
                         <div className="mt-2 flex items-baseline justify-between border-t border-amber-200/60 pt-1.5">
                           <span className="text-[10px] font-semibold text-amber-700">
-                            Total Tagihan:
+                            Total Tagihan Meja:
                           </span>
                           <span className="font-mono text-xs font-extrabold tabular-nums text-slate-900">
-                            Rp {formatPrice(activeOrder.total_amount)}
+                            Rp {formatPrice(tableTotal)}
                           </span>
                         </div>
                       </div>
@@ -229,10 +237,16 @@ export function TablesView({
               <div className="mt-4 flex flex-col gap-2 pt-2">
                 {isOccupied ? (
                   <div className="flex items-center gap-2">
-                    {activeOrder && onSelectOrder ? (
+                    {tableOrders.length > 0 && (onSelectTableOrders || onSelectOrder) ? (
                       <button
                         type="button"
-                        onClick={() => onSelectOrder(activeOrder)}
+                        onClick={() => {
+                          if (onSelectTableOrders) {
+                            onSelectTableOrders(tbl, tableOrders)
+                          } else if (onSelectOrder && activeOrder) {
+                            onSelectOrder(activeOrder)
+                          }
+                        }}
                         className="flex h-8.5 flex-1 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 text-xs font-extrabold text-white shadow-xs transition-all duration-200 hover:bg-blue-700 active:scale-[0.98] cursor-pointer"
                       >
                         <CreditCard size={14} />

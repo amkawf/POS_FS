@@ -106,6 +106,7 @@ export function SavedOrdersModal({
     <Modal
       opened={opened}
       onClose={onClose}
+      zIndex={400}
       title={
         <div className="flex items-center gap-2">
           <ShoppingBag size={18} strokeWidth={2} className="text-blue-600" />
@@ -272,6 +273,7 @@ export function SavedOrdersModal({
       <Modal
         opened={orderToDelete !== null}
         onClose={() => setOrderToDelete(null)}
+        zIndex={500}
         title={
           <div className="flex items-center gap-2 text-sm font-bold text-red-600">
             <AlertTriangle size={18} strokeWidth={2} />

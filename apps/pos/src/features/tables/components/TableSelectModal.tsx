@@ -12,6 +12,7 @@ type TableSelectModalProps = {
   selectedTableId: string | null
   onSelectTable: (table: Table) => void
   onSelectOrder?: (order: OrderResponse) => void
+  onSelectTableOrders?: (table: Table, orders: OrderResponse[]) => void
   onClearTable: () => void
 }
 
@@ -23,12 +24,14 @@ export function TableSelectModal({
   selectedTableId,
   onSelectTable,
   onSelectOrder,
+  onSelectTableOrders,
   onClearTable,
 }: TableSelectModalProps) {
   return (
     <Modal
       opened={opened}
       onClose={onClose}
+      zIndex={400}
       title={
         <div className="flex items-center gap-2 text-slate-900 font-extrabold text-sm">
           <Table2 size={18} strokeWidth={2} className="text-blue-600" />
@@ -71,7 +74,9 @@ export function TableSelectModal({
             const isSelected = tbl.id === selectedTableId
             const isAvailable = tbl.status === "AVAILABLE"
             const isOccupied = tbl.status === "OCCUPIED"
-            const activeOrder = openOrders.find((o) => o.table_id === tbl.id)
+            const tableOrders = openOrders.filter((o) => o.table_id === tbl.id)
+            const tableTotal = tableOrders.reduce((sum, o) => sum + o.total_amount, 0)
+            const activeOrder = tableOrders[0]
 
             return (
               <div
@@ -113,24 +118,30 @@ export function TableSelectModal({
                     <span>{tbl.capacity} Kursi</span>
                   </div>
 
-                  {isOccupied && activeOrder && (
+                  {isOccupied && tableOrders.length > 0 && (
                     <div className="mt-2 rounded-md bg-amber-100/70 p-1.5 text-left text-[10px]">
                       <div className="font-bold text-amber-900 truncate">
-                        #{activeOrder.order_number}
+                        {tableOrders.length > 1
+                          ? `${tableOrders.length} Pesanan Aktif`
+                          : `#${tableOrders[0].order_number}`}
                       </div>
                       <div className="font-mono font-extrabold text-slate-900">
-                        Rp {formatPrice(activeOrder.total_amount)}
+                        Rp {formatPrice(tableTotal)}
                       </div>
                     </div>
                   )}
                 </div>
 
                 <div className="pt-2 border-t border-slate-100 mt-1 flex flex-col gap-1.5">
-                  {isOccupied && activeOrder && onSelectOrder ? (
+                  {isOccupied && tableOrders.length > 0 && (onSelectTableOrders || onSelectOrder) ? (
                     <button
                       type="button"
                       onClick={() => {
-                        onSelectOrder(activeOrder)
+                        if (onSelectTableOrders) {
+                          onSelectTableOrders(tbl, tableOrders)
+                        } else if (onSelectOrder && activeOrder) {
+                          onSelectOrder(activeOrder)
+                        }
                         onClose()
                       }}
                       className="flex h-7 w-full items-center justify-center gap-1 rounded-md bg-blue-600 px-2 text-[10px] font-bold text-white shadow-2xs transition-all hover:bg-blue-700 active:scale-[0.98] cursor-pointer"

@@ -49,7 +49,7 @@ import {
 } from "./api"
 import { DEV_COMPANY_ID, DEV_STORE_ID } from "./config"
 import type { PosView } from "./types/navigation"
-import type { OrderItem } from "./types/pos"
+import type { OrderItem, Table } from "./types/pos"
 
 import { useLocation, useNavigate } from "react-router-dom"
 import { ALL_NAV_ITEMS } from "./config/navigation"
@@ -307,6 +307,38 @@ const getCashierName = (userId?: string) => {
     }
   }
 
+  const handleLoadTableOrders = async (table: Table, orders: OrderResponse[]) => {
+    try {
+      // Ambil detail seluruh item untuk semua pesanan meja ini secara paralel
+      const detailPromises = orders.map((ord) =>
+        fetchOrderById(ord.id, DEV_COMPANY_ID, DEV_STORE_ID),
+      )
+      const fullOrders = await Promise.all(detailPromises)
+
+      const mergedItems: OrderItem[] = []
+      for (const ord of fullOrders) {
+        for (const it of ord.items ?? []) {
+          mergedItems.push({
+            menuItemId: it.menu_item_id,
+            sku: it.sku,
+            name: it.item_name,
+            price: it.unit_price,
+            qty: it.quantity,
+            notes: it.notes ?? undefined,
+          })
+        }
+      }
+
+      cart.loadTableSession(table, fullOrders, mergedItems)
+      setSuccessMessage(
+        `Semua pesanan ${table.table_number} (${orders.length} kloter) dimuat ke kasir. Siap dibayar!`,
+      )
+      handleViewChange("ORDERS")
+    } catch (err) {
+      alert(`Gagal memuat pesanan meja: ${(err as Error).message}`)
+    }
+  }
+
   const handleOpenReceiptFromPayment = async (order: OrderResponse) => {
     try {
       const fullOrder = await fetchOrderById(order.id, DEV_COMPANY_ID, DEV_STORE_ID)
@@ -352,7 +384,7 @@ const getCashierName = (userId?: string) => {
       const finalTotal = cart.total
 
       // 1. Create order if fresh cart
-      if (!targetOrderId) {
+      if (!targetOrderId && cart.activeOrderIds.length === 0) {
         const created = await createOrder({
           company_id: DEV_COMPANY_ID,
           store_id: DEV_STORE_ID,
@@ -373,28 +405,43 @@ const getCashierName = (userId?: string) => {
         targetOrderNumber = created.order_number
       }
 
-      // 2. Pay order
-      const paidOrder = await payOrder(targetOrderId, {
-        company_id: DEV_COMPANY_ID,
-        store_id: DEV_STORE_ID,
-        payment_method: paymentMethod,
-        amount_paid: amountPaid,
-      })
+      // 2. Pay order(s)
+      let lastPaidOrder: OrderResponse | null = null
+
+      if (cart.activeOrderIds.length > 1) {
+        for (const ordId of cart.activeOrderIds) {
+          const ord = openOrders.find((o) => o.id === ordId)
+          const amountToPay = ord ? ord.total_amount : finalTotal
+          lastPaidOrder = await payOrder(ordId, {
+            company_id: DEV_COMPANY_ID,
+            store_id: DEV_STORE_ID,
+            payment_method: paymentMethod,
+            amount_paid: amountToPay,
+          })
+        }
+      } else if (targetOrderId) {
+        lastPaidOrder = await payOrder(targetOrderId, {
+          company_id: DEV_COMPANY_ID,
+          store_id: DEV_STORE_ID,
+          payment_method: paymentMethod,
+          amount_paid: amountPaid,
+        })
+      }
 
       // 3. Setup receipt data
       const targetTableNumber =
         cart.selectedTable?.table_number ||
-        (paidOrder.table_id ? tables.find((t) => t.id === paidOrder.table_id)?.table_number : undefined)
+        (lastPaidOrder?.table_id ? tables.find((t) => t.id === lastPaidOrder?.table_id)?.table_number : undefined)
 
-      const changeAmount = amountPaid - paidOrder.total_amount
+      const changeAmount = amountPaid - finalTotal
       setReceiptData({
-        orderNumber: paidOrder.order_number || targetOrderNumber || "ORD-DONE",
-        orderType: paidOrder.order_type || targetOrderType,
+        orderNumber: cart.lastOrderNumber || lastPaidOrder?.order_number || targetOrderNumber || "ORD-DONE",
+        orderType: lastPaidOrder?.order_type || targetOrderType,
         tableNumber: targetTableNumber,
         cashierName: currentUser?.name,
         items: [...cart.orderItems],
-        subtotal: paidOrder.subtotal || finalSubtotal,
-        totalAmount: paidOrder.total_amount || finalTotal,
+        subtotal: finalSubtotal,
+        totalAmount: finalTotal,
         paymentMethod,
         amountPaid,
         change: changeAmount,
@@ -716,6 +763,7 @@ const getCashierName = (userId?: string) => {
               handleViewChange("ORDERS")
             }}
             onSelectOrder={handleLoadOrderFromDashboard}
+            onSelectTableOrders={handleLoadTableOrders}
             onReleaseTable={async (tableId) => {
               try {
                 await updateTableStatus(tableId, {
@@ -790,6 +838,10 @@ const getCashierName = (userId?: string) => {
         }}
         onSelectOrder={(order) => {
           handleLoadOrderFromDashboard(order)
+          setTableModalOpen(false)
+        }}
+        onSelectTableOrders={(tbl, orders) => {
+          handleLoadTableOrders(tbl, orders)
           setTableModalOpen(false)
         }}
         onClearTable={() => cart.setSelectedTable(null)}

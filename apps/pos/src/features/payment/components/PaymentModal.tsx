@@ -68,6 +68,7 @@ export function PaymentModal({
     <Modal
       opened={opened}
       onClose={onClose}
+      zIndex={400}
       title={
         <div className="flex items-center gap-2">
           <CreditCard size={18} strokeWidth={2} className="text-blue-600" />

@@ -88,7 +88,47 @@ export async function submitCustomerOrder(payload: CreateCustomerOrderPayload): 
     await parseErrorResponse(response)
   }
 
-  const data: { order: OrderResponse } = await response.json()
-  return data.order
+  const data: OrderResponse = await response.json()
+  return data
+}
+
+export async function fetchActiveOrdersByTable(
+  companyId: string,
+  storeId: string,
+  tableId: string,
+): Promise<OrderResponse[]> {
+  // 1. Cari semua pesanan yang statusnya OPEN di toko ini untuk meja tersebut
+  const url = new URL(`${API_BASE_URL}/orders`)
+  url.searchParams.set("company_id", companyId)
+  url.searchParams.set("store_id", storeId)
+  url.searchParams.set("status", "OPEN")
+
+  const response = await fetch(url)
+  if (!response.ok) return []
+
+  const data: { orders: OrderResponse[] } = await response.json()
+  const tableOrders = (data.orders || []).filter((o) => o.table_id === tableId)
+  if (tableOrders.length === 0) return []
+
+  // 2. Ambil rincian lengkap pesanan (beserta daftar items) untuk setiap kloter pesanan secara paralel
+  const detailPromises = tableOrders.map(async (ord) => {
+    try {
+      const detailUrl = new URL(`${API_BASE_URL}/orders/${ord.id}`)
+      detailUrl.searchParams.set("company_id", companyId)
+      detailUrl.searchParams.set("store_id", storeId)
+
+      const detailRes = await fetch(detailUrl)
+      if (!detailRes.ok) return ord
+      return (await detailRes.json()) as OrderResponse
+    } catch {
+      return ord
+    }
+  })
+
+  const results = await Promise.all(detailPromises)
+  // Urutkan dari kloter paling awal ke paling baru (opened_at asc)
+  return results.sort(
+    (a, b) => new Date(a.opened_at).getTime() - new Date(b.opened_at).getTime(),
+  )
 }
 

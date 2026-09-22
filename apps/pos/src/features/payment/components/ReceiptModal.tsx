@@ -42,6 +42,7 @@ export function ReceiptModal({
     <Modal
       opened={opened}
       onClose={onClose}
+      zIndex={400}
       title={
         <div className="flex items-center gap-2 font-extrabold text-sm text-emerald-600">
           <CheckCircle size={18} strokeWidth={2} />

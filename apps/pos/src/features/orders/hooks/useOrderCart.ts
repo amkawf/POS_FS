@@ -7,6 +7,7 @@ export function useOrderCart() {
   const [orderType, setOrderType] = useState<"DINE_IN" | "TAKEAWAY">("DINE_IN")
   const [selectedTable, setSelectedTable] = useState<Table | null>(null)
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null)
+  const [activeOrderIds, setActiveOrderIds] = useState<string[]>([])
   const [lastOrderNumber, setLastOrderNumber] = useState<string | null>(null)
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false)
 
@@ -79,6 +80,7 @@ export function useOrderCart() {
   const clearCart = () => {
     setOrderItems([])
     setActiveOrderId(null)
+    setActiveOrderIds([])
     setSelectedTable(null)
     setLastOrderNumber(null)
   }
@@ -89,6 +91,7 @@ export function useOrderCart() {
     tables: Table[] = [],
   ) => {
     setActiveOrderId(order.id)
+    setActiveOrderIds([order.id])
     setLastOrderNumber(order.order_number)
     setOrderType(order.order_type as "DINE_IN" | "TAKEAWAY")
     if (order.table_id) {
@@ -97,6 +100,20 @@ export function useOrderCart() {
     } else {
       setSelectedTable(null)
     }
+    setOrderItems(items)
+  }
+
+  const loadTableSession = (
+    table: Table,
+    orders: OrderResponse[],
+    items: OrderItem[],
+  ) => {
+    setActiveOrderId(orders[0]?.id ?? null)
+    setActiveOrderIds(orders.map((o) => o.id))
+    const orderNumbers = orders.map((o) => `#${o.order_number}`).join(", ")
+    setLastOrderNumber(orderNumbers)
+    setOrderType("DINE_IN")
+    setSelectedTable(table)
     setOrderItems(items)
   }
 
@@ -117,6 +134,8 @@ export function useOrderCart() {
     setSelectedTable,
     activeOrderId,
     setActiveOrderId,
+    activeOrderIds,
+    setActiveOrderIds,
     lastOrderNumber,
     setLastOrderNumber,
     cartDrawerOpen,
@@ -128,6 +147,7 @@ export function useOrderCart() {
     updateItemNotes,
     clearCart,
     loadSavedOrder,
+    loadTableSession,
     itemCount,
     subtotal,
     tax,
