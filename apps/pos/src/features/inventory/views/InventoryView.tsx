@@ -478,7 +478,7 @@ export function InventoryView({ products, categories }: InventoryViewProps) {
                               setAdjustQty(20)
                             }}
                           >
-                            + Masak
+                            Masak
                           </Button>
                         )}
                         {/* Tombol Hapus Menu */}
