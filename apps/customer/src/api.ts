@@ -131,4 +131,3 @@ export async function fetchActiveOrdersByTable(
     (a, b) => new Date(a.opened_at).getTime() - new Date(b.opened_at).getTime(),
   )
 }
-
