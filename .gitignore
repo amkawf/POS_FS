@@ -32,3 +32,5 @@ Thumbs.db
 # Claude / AI caches (opsional)
 .claude/settings.local.json
 
+INTERNSHIP_REPORT.md
+
