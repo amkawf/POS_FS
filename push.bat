@@ -6,22 +6,23 @@ echo ========================================================
 echo.
 echo [1/3] Commit and Push submodule Backend...
 cd backend
-git add .
-git commit -m "feat: support Vercel PORT and serverless entrypoint"
+if exist api rmdir /s /q api
+git add -A
+git commit -m "fix: use native Vercel Go preset and non-blocking startup on PORT"
 git push origin HEAD
 cd ..
 
 echo.
 echo [2/3] Commit and Push submodule Frontend...
 cd frontend
-git add .
+git add -A
 git commit -m "feat: table session settlement, combined orders checkout, and vercel config"
 git push origin HEAD
 cd ..
 
 echo.
 echo [3/3] Commit and Push Root Project...
-git add .
+git add -A
 git commit -m "feat: update backend and frontend submodules for deployment"
 git push origin HEAD
 
